@@ -18,11 +18,12 @@ import (
 )
 
 var (
-	configFile    string
-	daemonMode    bool
-	domain        string
-	createDomain  bool
-	listDomains   bool
+	configFile     string
+	daemonMode     bool
+	domain         string
+	createDomain   bool
+	listDomains    bool
+	defaultDomain  string
 )
 
 var rootCmd = &cobra.Command{
@@ -38,6 +39,7 @@ func init() {
 	rootCmd.Flags().StringVar(&domain, "domain", "", "start server in specific domain context (e.g., 'project1' or 'team:backend')")
 	rootCmd.Flags().BoolVar(&createDomain, "create-domain", false, "create domain if it doesn't exist (use with --domain)")
 	rootCmd.Flags().BoolVar(&listDomains, "list-domains", false, "list all available domains and exit")
+	rootCmd.Flags().StringVar(&defaultDomain, "default-domain", "", "set the default domain for the server (overrides config)")
 }
 
 func main() {
@@ -52,6 +54,12 @@ func runServer(cmd *cobra.Command, args []string) {
 	cfg, err := config.Load(configFile)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Override default domain if specified via CLI
+	if defaultDomain != "" {
+		cfg.Domain.DefaultDomain = defaultDomain
+		log.Printf("Default domain set to: %s", defaultDomain)
 	}
 
 	// Initialize storage
@@ -81,9 +89,11 @@ func runServer(cmd *cobra.Command, args []string) {
 		if err := handleDomainStartup(mcpServer, domain, createDomain); err != nil {
 			log.Fatalf("Failed to setup domain: %v", err)
 		}
+		cfg.Domain.CurrentDomain = domain
 		log.Printf("Starting MindPort in domain context: %s", domain)
 	} else {
-		log.Printf("Starting MindPort in default domain context")
+		cfg.Domain.CurrentDomain = cfg.Domain.DefaultDomain
+		log.Printf("Starting MindPort in default domain context: %s", cfg.Domain.DefaultDomain)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
