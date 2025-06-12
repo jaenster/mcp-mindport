@@ -1,62 +1,70 @@
-# MindPort
+# MindPort MCP Server
 
-A high-performance Model Context Protocol (MCP) resource server built in Go, designed for AI systems to efficiently store, search, and retrieve data with minimal token usage.
+A high-performance Model Context Protocol (MCP) server built in TypeScript/Node.js, designed for AI systems to efficiently store, search, and retrieve resources with minimal token usage and modern search capabilities.
 
-## Features
+## ✨ Features
 
-- **Optimized Search**: Token-efficient search mechanism specifically designed for AI systems
-- **Dual Storage**: Fast key-value storage (BadgerDB) combined with full-text search (Bleve)
-- **Resource Management**: Store and retrieve various types of resources with metadata
-- **Prompt Templates**: Store and manage reusable prompt templates
-- **Daemon Mode**: Run as background service with WebSocket support
-- **MCP Compatible**: Full Model Context Protocol implementation
+- **🔍 Advanced Search**: Token-efficient fuzzy search, regex patterns, and grep-like functionality
+- **📦 SQLite Storage**: Reliable, lightweight database with domain isolation
+- **🏷️ Smart Organization**: Domain-based resource management with tag filtering
+- **🎯 AI-Optimized**: Designed specifically for Claude Desktop/Code integration
+- **⚡ High Performance**: Fast search and retrieval optimized for large datasets  
+- **🧪 Comprehensive Testing**: 76+ tests covering all functionality
+- **📝 Prompt Templates**: Store and render reusable prompt templates with variables
 
-## Quick Start
+## 🚀 Quick Start
 
-### For Claude Code CLI Users
+### For Claude Desktop Users (Recommended)
 
 ```bash
-# Quick setup (recommended)
-./claude-code-setup.sh
+# Install dependencies
+npm install
 
-# Start daemon
-mcp-mindport --daemon &
+# Configure Claude Desktop integration  
+npm run start -- --list-domains  # Test installation
 
-# Claude Code will automatically use MindPort via environment variables
+# MindPort is now available in Claude Desktop!
 ```
 
-### For Claude Desktop Users
+### Manual Setup
 
 ```bash
-# Full installation with Claude Desktop integration
-./install.sh
-
-# Follow prompts to configure Claude Desktop
-# Restart Claude Desktop to load MindPort
-```
-
-### Manual Build and Run
-
-```bash
-# Clone and build
+# Clone repository
 git clone <repository>
 cd mcp-mindport
-go mod tidy
-go build -o mcp-mindport
 
-# Run in stdio mode (for MCP clients)
-./mcp-mindport
+# Install dependencies
+npm install
 
-# Run as daemon
-./mcp-mindport --daemon
+# Run server in stdio mode (for MCP clients)
+npm start
 
-# Use custom config
-./mcp-mindport --config /path/to/config.yaml
+# Run with custom domain
+npm start -- --domain my-project
+
+# List available domains
+npm start -- --list-domains
 ```
 
-### Configuration
+### Development & Testing
 
-Create a `.mcp-mindport.yaml` file in your home directory or current directory:
+```bash
+# Run comprehensive test suite (76 tests)
+npm test
+
+# Run tests once
+npm run test:run
+
+# Run tests with UI
+npm run test:ui
+
+# Run with coverage
+npm run test:coverage
+```
+
+## 🔧 Configuration
+
+The server automatically creates configuration at `~/.config/mindport/config.yaml`:
 
 ```yaml
 server:
@@ -64,125 +72,319 @@ server:
   port: 8080
 
 storage:
-  path: "./data/storage"
+  path: "~/.config/mindport/data/storage.db"
 
 search:
-  index_path: "./data/search"
+  index_path: "~/.config/mindport/data/search"
 
-daemon:
-  pid_file: "/tmp/mcp-mindport.pid"
-  log_file: "/tmp/mcp-mindport.log"
+domain:
+  default_domain: "default"
 ```
 
-## MCP Integration
+### Environment Variables
 
-### With Claude Desktop
+```bash
+# Disable logging (recommended for MCP)
+export MCP_MINDPORT_LOG=discard
 
-Add to your Claude Desktop configuration:
+# Set custom domain
+export MCP_MINDPORT_DOMAIN=my-project
+
+# Custom storage path
+export MCP_MINDPORT_STORE_PATH=/path/to/storage.db
+```
+
+## 🛠️ Claude Desktop Integration
+
+Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "mindport": {
-      "command": "/path/to/mcp-mindport",
-      "args": [],
-      "env": {}
+      "command": "npx",
+      "args": ["ts-node", "/path/to/mcp-mindport/index.ts"],
+      "env": {
+        "MCP_MINDPORT_LOG": "discard"
+      }
     }
   }
 }
 ```
 
-### With Other MCP Clients
+**Restart Claude Desktop** to activate MindPort!
 
-The server supports both stdio and WebSocket transports:
+## 📚 Available MCP Tools
 
-- **Stdio**: Default mode, use the binary directly
-- **WebSocket**: Run with `--daemon` flag, connect to `ws://localhost:8080/mcp`
+### Resource Management
 
-## Available Tools
-
-### store_resource
-
-Store a new resource with content and metadata.
-
-```json
+#### `store_resource`
+Store content with metadata and tags
+```typescript
 {
-  "title": "API Documentation",
-  "content": "REST API endpoints...",
-  "type": "documentation",
-  "tags": ["api", "docs"],
-  "metadata": {"version": "1.0"}
+  id: "api-docs-v1",
+  name: "API Documentation", 
+  description: "REST API endpoints and authentication",
+  content: "GET /users - Retrieve users...",
+  tags: ["api", "documentation", "rest"],
+  mimeType: "text/markdown"
 }
 ```
 
-### search_resources
+#### `get_resource`
+Retrieve specific resource by ID
+```typescript
+{ id: "api-docs-v1" }
+```
 
-Search for resources using optimized token-efficient search.
+#### `list_resources` 
+List resources in current domain
+```typescript
+{ limit: 20, offset: 0 }
+```
 
-```json
+### Search & Discovery
+
+#### `search_resources`
+Fast, token-efficient fuzzy search
+```typescript
 {
-  "query": "API authentication",
-  "limit": 10,
-  "type": "resource",
-  "tags": ["api"]
+  query: "API authentication methods",
+  limit: 10
 }
 ```
 
-### store_prompt
-
-Store a reusable prompt template.
-
-```json
+#### `advanced_search`
+Complex queries with tag filtering
+```typescript
 {
-  "name": "code_review",
-  "description": "Code review prompt template",
-  "template": "Review this {{language}} code for {{focus}}:\n\n{{code}}",
-  "variables": {
-    "language": "Programming language",
-    "focus": "Review focus area",
-    "code": "Code to review"
-  },
-  "tags": ["review", "code"]
+  query: "database design",
+  tags: ["sql", "performance"],
+  exactTags: true
 }
 ```
 
-## Architecture
+#### `grep`
+Regex pattern matching (like ripgrep)
+```typescript
+{ pattern: "function\\s+\\w+\\(" }
+```
 
-- **Storage Layer**: BadgerDB for fast key-value operations
-- **Search Layer**: Bleve for full-text search and indexing  
-- **MCP Layer**: JSON-RPC 2.0 protocol implementation
-- **Transport Layer**: Stdio and WebSocket support
-- **Daemon Layer**: Background service with HTTP endpoints
+#### `find`
+Find resources by name patterns
+```typescript
+{ pattern: "^API.*" }
+```
 
-## Token Optimization
+### Domain Management
 
-The search system is optimized for minimal token usage:
+#### `list_domains`
+List all available domains
+```typescript
+{}
+```
 
-- Compact result formatting
-- Relevant snippet extraction
-- Score-based ranking
-- Configurable result limits
-- Semantic filtering
+#### `create_domain` 
+Create new domain context
+```typescript
+{
+  name: "frontend-project",
+  description: "Frontend development resources"
+}
+```
 
-## API Endpoints (Daemon Mode)
+#### `switch_domain`
+Change current domain
+```typescript
+{ domain: "frontend-project" }
+```
 
-- `GET /`: Server information page
-- `GET /health`: Health check endpoint
-- `WS /mcp`: WebSocket MCP endpoint
+#### `domain_stats`
+Get domain statistics and top tags
+```typescript
+{ domain: "frontend-project" }  // optional
+```
 
-## Development
+### Prompt Templates
+
+#### `store_prompt`
+Store reusable prompt templates
+```typescript
+{
+  id: "code-review",
+  name: "Code Review Prompt",
+  template: "Review this {{language}} code for {{focus}}:\n\n```{{language}}\n{{code}}\n```",
+  variables: ["language", "focus", "code"]
+}
+```
+
+#### `list_prompts`
+List available prompt templates
+```typescript
+{}
+```
+
+#### `get_prompt`
+Retrieve and render prompts with variables
+```typescript
+{
+  id: "code-review",
+  variables: {
+    "language": "TypeScript",
+    "focus": "performance",
+    "code": "const result = await fetch('/api');"
+  }
+}
+```
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐
+│   Claude Desktop │ (MCP Client)
+│                 │
+└─────────┬───────┘
+          │ JSON-RPC 2.0 via stdio
+          │
+┌─────────▼───────┐
+│   MCP Server    │ (TypeScript/Node.js)
+│                 │
+├─────────────────┤
+│ Domain Manager  │ (Project isolation)
+│                 │  
+├─────────────────┤
+│ Fuse.js Search  │ (Fuzzy + pattern search)
+│                 │
+├─────────────────┤
+│ SQLite Storage  │ (Resources + prompts)
+│                 │
+└─────────────────┘
+```
+
+### Key Components
+
+- **TypeScript/Node.js**: Modern, maintainable codebase
+- **SQLite**: Reliable embedded database with ACID transactions
+- **Fuse.js**: Advanced fuzzy search with scoring and highlighting
+- **Official MCP SDK**: Anthropic's official Model Context Protocol implementation
+- **Commander.js**: Robust CLI interface with comprehensive options
+- **Vitest**: Modern testing framework with 76+ comprehensive tests
+
+## 🎯 Token Optimization
+
+MindPort is specifically optimized for AI interactions:
+
+- **Compact Responses**: Minimal formatting, maximum information density
+- **Smart Truncation**: Long content is intelligently summarized
+- **Relevance Scoring**: Results ranked by relevance to save tokens
+- **Configurable Limits**: Control response size with limit parameters
+- **Context-Aware**: Domain isolation reduces noise in search results
+
+## 🔍 Search Capabilities
+
+### Fuzzy Search
+```bash
+# Finds "JavaScript Tutorial" even with typos
+search_resources: "javascrpt tutorial"
+```
+
+### Regex Patterns  
+```bash
+# Find all function definitions
+grep: "function\\s+\\w+\\("
+
+# Find resources starting with "API"
+find: "^API.*"
+```
+
+### Tag-Based Filtering
+```bash
+# Exact tag matching
+advanced_search: { query: "auth", tags: ["security"], exactTags: true }
+
+# Partial tag matching  
+advanced_search: { query: "auth", tags: ["sec"], exactTags: false }
+```
+
+## 📊 Performance
+
+Tested with 100+ resources:
+- **Storage**: < 10s for 100 resources
+- **Indexing**: < 1s for search index updates
+- **Search**: < 100ms for fuzzy search queries
+- **Grep**: < 100ms for regex pattern matching
+- **Pagination**: < 500ms for large result sets
+
+## 🧪 Testing
+
+Comprehensive test suite with 76 tests covering:
+
+- **Storage Layer** (17 tests): SQLite operations, CRUD, domain isolation
+- **Search Engine** (30 tests): Fuzzy search, patterns, grep, tag filtering
+- **MCP Server** (25 tests): All tools, error handling, tool schemas
+- **Integration** (4 tests): End-to-end workflows, performance, multi-domain
 
 ```bash
-# Run tests
-go test ./...
+# Run all tests
+npm test
 
-# Format code
-go fmt ./...
-
-# Build for production
-go build -ldflags="-s -w" -o mcp-mindport
+# Run specific test suites
+npm test storage
+npm test search  
+npm test server
+npm test integration
 ```
 
-## License
+## 🚀 Advanced Usage
 
-MIT License
+### Multi-Domain Workflow
+```bash
+# Create project domains
+create_domain: { name: "frontend", description: "Frontend code and docs" }
+create_domain: { name: "backend", description: "API and database" }
+
+# Switch contexts
+switch_domain: { domain: "frontend" }
+
+# Store domain-specific resources
+store_resource: { 
+  name: "React Component", 
+  content: "const Button = ...",
+  tags: ["react", "component"]
+}
+```
+
+### Template-Driven Prompts
+```bash
+# Store template
+store_prompt: {
+  id: "bug-report",
+  template: "Bug in {{component}}:\n**Expected:** {{expected}}\n**Actual:** {{actual}}"
+}
+
+# Use template
+get_prompt: {
+  id: "bug-report", 
+  variables: { 
+    component: "Login Form",
+    expected: "User logged in",
+    actual: "Error 401"
+  }
+}
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Write tests for new functionality
+4. Ensure all tests pass: `npm run test:run`
+5. Submit a pull request
+
+## 📄 License
+
+MIT License - see LICENSE file for details.
+
+---
+
+**Built for Claude Desktop** 🤖 | **Optimized for AI Workflows** ⚡ | **TypeScript + SQLite + Vitest** 🛠️
