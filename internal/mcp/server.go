@@ -106,7 +106,7 @@ func (s *Server) Start(ctx context.Context) error {
 				continue
 			}
 
-			response := s.handleRequest(ctx, &request)
+			response := s.HandleRequest(ctx, &request)
 			if err := encoder.Encode(response); err != nil {
 				log.Printf("Failed to encode response: %v", err)
 			}
@@ -114,7 +114,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
-func (s *Server) handleRequest(ctx context.Context, request *MCPRequest) *MCPResponse {
+func (s *Server) HandleRequest(ctx context.Context, request *MCPRequest) *MCPResponse {
 	switch request.Method {
 	case "initialize":
 		return s.handleInitialize(request)
@@ -224,7 +224,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 
 	// Extract resource ID from URI (mindport://resource/{id})
 	parts := strings.Split(uri, "/")
-	if len(parts) < 3 || parts[0] != "mindport:" || parts[2] != "resource" {
+	if len(parts) < 4 || parts[0] != "mindport:" || parts[2] != "resource" {
 		return &MCPResponse{
 			JSONRPC: "2.0",
 			ID:      request.ID,
@@ -236,7 +236,20 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 	}
 
 	resourceID := parts[3]
-	resource, err := s.storage.GetResource(ctx, resourceID)
+	if resourceID == "" {
+		return &MCPResponse{
+			JSONRPC: "2.0",
+			ID:      request.ID,
+			Error: &MCPError{
+				Code:    -32602,
+				Message: "Invalid URI format",
+			},
+		}
+	}
+	
+	// Use domain-aware resource retrieval
+	currentDomain := s.domainManager.GetCurrentDomain()
+	resource, err := s.storage.GetResourceInDomain(ctx, resourceID, currentDomain)
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
@@ -785,6 +798,7 @@ func (s *Server) handleStoreResource(ctx context.Context, request *MCPRequest, a
 		ID:      id,
 		Title:   title,
 		Content: content,
+		Domain:  s.domainManager.GetCurrentDomain(),
 	}
 
 	if resourceType, ok := args["type"].(string); ok {
@@ -804,7 +818,7 @@ func (s *Server) handleStoreResource(ctx context.Context, request *MCPRequest, a
 	}
 
 	// Store resource
-	if err := s.storage.StoreResource(ctx, resource); err != nil {
+	if err := s.storage.StoreResourceInDomain(ctx, resource, resource.Domain); err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
 			ID:      request.ID,
@@ -914,6 +928,7 @@ func (s *Server) handleStorePrompt(ctx context.Context, request *MCPRequest, arg
 		ID:       id,
 		Name:     name,
 		Template: template,
+		Domain:   s.domainManager.GetCurrentDomain(),
 	}
 
 	if description, ok := args["description"].(string); ok {
@@ -938,7 +953,7 @@ func (s *Server) handleStorePrompt(ctx context.Context, request *MCPRequest, arg
 	}
 
 	// Store prompt
-	if err := s.storage.StorePrompt(ctx, prompt); err != nil {
+	if err := s.storage.StorePromptInDomain(ctx, prompt, prompt.Domain); err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
 			ID:      request.ID,

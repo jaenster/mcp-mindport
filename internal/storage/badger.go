@@ -193,7 +193,13 @@ func (s *BadgerStore) StorePrompt(ctx context.Context, prompt *Prompt) error {
 	}
 
 	return s.db.Update(func(txn *badger.Txn) error {
-		key := fmt.Sprintf("prompt:%s", prompt.ID)
+		// Use domain-aware key if domain is specified
+		var key string
+		if prompt.Domain != "" && prompt.Domain != "default" {
+			key = s.buildPromptKey(prompt.ID, prompt.Domain)
+		} else {
+			key = fmt.Sprintf("prompt:%s", prompt.ID)
+		}
 		return txn.Set([]byte(key), data)
 	})
 }

@@ -64,6 +64,7 @@ type AdvancedSearchResult struct {
 	Content     string                 `json:"content"`
 	Metadata    map[string]interface{} `json:"metadata"`
 	Tags        []string               `json:"tags"`
+	Domain      string                 `json:"domain"`
 	CreatedAt   time.Time              `json:"created_at"`
 	UpdatedAt   time.Time              `json:"updated_at"`
 	
@@ -332,6 +333,18 @@ func (s *BleveSearch) buildFilters(query *AdvancedSearchQuery) []blevequery.Quer
 		filters = append(filters, contentTypeQuery)
 	}
 	
+	// Domain filter
+	if len(query.Domains) > 0 {
+		domainQueries := []blevequery.Query{}
+		for _, domain := range query.Domains {
+			domainQuery := bleve.NewTermQuery(domain)
+			domainQuery.SetField("domain")
+			domainQueries = append(domainQueries, domainQuery)
+		}
+		// Use disjunction (OR) to match any of the specified domains
+		filters = append(filters, bleve.NewDisjunctionQuery(domainQueries...))
+	}
+	
 	// Date range filters would be added here
 	// (requires date field mapping in the index)
 	
@@ -374,6 +387,9 @@ func (s *BleveSearch) processAdvancedResults(searchResult *bleve.SearchResult, q
 			for _, tag := range result.Tags {
 				stats.TagBreakdown[tag]++
 			}
+		}
+		if domain, ok := hit.Fields["domain"].(string); ok {
+			result.Domain = domain
 		}
 		
 		// Add highlights if available

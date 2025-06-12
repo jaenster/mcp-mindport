@@ -107,6 +107,7 @@ func (s *BleveSearch) IndexResource(ctx context.Context, resource *storage.Resou
 		"tags":         strings.Join(resource.Tags, " "),
 		"search_terms": strings.Join(resource.SearchTerms, " "),
 		"metadata":     resource.Metadata,
+		"domain":       resource.Domain,
 	}
 
 	return s.index.Index(resource.ID, doc)
@@ -123,6 +124,7 @@ func (s *BleveSearch) IndexPrompt(ctx context.Context, prompt *storage.Prompt) e
 		"name":        prompt.Name,
 		"description": prompt.Description,
 		"template":    prompt.Template,
+		"domain":      prompt.Domain,
 	}
 
 	return s.index.Index(prompt.ID, doc)

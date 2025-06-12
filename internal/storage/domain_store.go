@@ -387,10 +387,29 @@ func (s *BadgerStore) GetDomainStats(ctx context.Context, domain string) (map[st
 			stats["resources"]++
 		}
 
-		// Count prompts
-		promptPrefix := []byte(s.getDomainPrefix("prompt", domain))
-		for it.Seek(promptPrefix); it.ValidForPrefix(promptPrefix); it.Next() {
-			stats["prompts"]++
+		// Count prompts - need to handle both domain-aware and legacy format
+		if domain == "" || domain == "default" {
+			// For default domain, count both legacy format (prompt:id) and domain-aware format (prompt::id)
+			// Count legacy format prompts
+			legacyPromptPrefix := []byte("prompt:")
+			for it.Seek(legacyPromptPrefix); it.ValidForPrefix(legacyPromptPrefix); it.Next() {
+				key := string(it.Item().Key())
+				// Only count if it matches the legacy format exactly (prompt:id, not prompt:domain:...)
+				if !strings.Contains(key[7:], ":") { // Skip "prompt:" and check if no more colons
+					stats["prompts"]++
+				}
+			}
+			// Count domain-aware default format prompts
+			defaultPromptPrefix := []byte(s.getDomainPrefix("prompt", domain))
+			for it.Seek(defaultPromptPrefix); it.ValidForPrefix(defaultPromptPrefix); it.Next() {
+				stats["prompts"]++
+			}
+		} else {
+			// For explicit domains, only count domain-aware format
+			promptPrefix := []byte(s.getDomainPrefix("prompt", domain))
+			for it.Seek(promptPrefix); it.ValidForPrefix(promptPrefix); it.Next() {
+				stats["prompts"]++
+			}
 		}
 
 		return nil

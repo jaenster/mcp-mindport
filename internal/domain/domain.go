@@ -76,16 +76,21 @@ func NewDomainManager(config *DomainConfig) *DomainManager {
 }
 
 func (dm *DomainManager) createDefaultDomain() {
+	defaultDomainID := dm.config.DefaultDomain
+	if defaultDomainID == "" {
+		defaultDomainID = DefaultDomain
+	}
+	
 	defaultDomain := &Domain{
-		ID:          DefaultDomain,
+		ID:          defaultDomainID,
 		Name:        "Default Domain",
 		Description: "Default domain for general resources",
-		Path:        DomainSeparator + DefaultDomain,
+		Path:        DomainSeparator + defaultDomainID,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 		Active:      true,
 	}
-	dm.domains[DefaultDomain] = defaultDomain
+	dm.domains[defaultDomainID] = defaultDomain
 }
 
 // CreateDomain creates a new domain with optional parent
@@ -157,7 +162,7 @@ func (dm *DomainManager) GetDomainScope(domainID string) (*DomainScope, error) {
 	
 	scope := &DomainScope{
 		Current:    domainID,
-		Ancestry:   dm.getAncestry(domain),
+		Ancestry:   dm.getFullAncestryPath(domain),
 		Children:   dm.getChildren(domainID),
 		Searchable: dm.getSearchableDomains(domainID),
 	}
@@ -165,7 +170,42 @@ func (dm *DomainManager) GetDomainScope(domainID string) (*DomainScope, error) {
 	return scope, nil
 }
 
-// getAncestry returns the parent hierarchy for a domain
+// getFullAncestryPath returns the full ancestry path for a domain (including the domain itself)
+func (dm *DomainManager) getFullAncestryPath(domain *Domain) []string {
+	visited := make(map[string]bool)
+	current := domain
+	maxDepth := 50 // Prevent infinite loops
+	depth := 0
+	
+	// Build ancestry from root to current domain
+	var path []string
+	
+	// Start with current domain
+	path = append(path, current.ID)
+	visited[current.ID] = true
+	
+	// Traverse up the parent chain
+	for current.Parent != "" && depth < maxDepth {
+		// Check for circular dependency
+		if visited[current.Parent] {
+			break
+		}
+		
+		path = append([]string{current.Parent}, path...)
+		visited[current.Parent] = true
+		
+		if parent, exists := dm.domains[current.Parent]; exists {
+			current = parent
+			depth++
+		} else {
+			break
+		}
+	}
+	
+	return path
+}
+
+// getAncestry returns the parent hierarchy for a domain (excluding the domain itself)
 func (dm *DomainManager) getAncestry(domain *Domain) []string {
 	var ancestry []string
 	visited := make(map[string]bool)
@@ -373,9 +413,15 @@ func (dm *DomainManager) GetDomainPrefix(domainID string) string {
 //   - "proj1:abc123" -> domain="proj1", id="abc123"
 //   - "abc123" -> domain="default", id="abc123"
 func (dm *DomainManager) ParseResourceID(resourceID string) (domain, id string) {
+	// Get configured default domain
+	defaultDomain := dm.config.DefaultDomain
+	if defaultDomain == "" {
+		defaultDomain = DefaultDomain
+	}
+	
 	// Shorthand notation for default domain
 	if strings.HasPrefix(resourceID, "::") {
-		return DefaultDomain, strings.TrimPrefix(resourceID, "::")
+		return defaultDomain, strings.TrimPrefix(resourceID, "::")
 	}
 	
 	// Explicit domain prefix (legacy support)
@@ -395,7 +441,7 @@ func (dm *DomainManager) ParseResourceID(resourceID string) (domain, id string) 
 	}
 	
 	// Default domain
-	return DefaultDomain, resourceID
+	return defaultDomain, resourceID
 }
 
 // BuildResourceID creates a domain-prefixed resource ID with shorthand notation
@@ -420,7 +466,13 @@ func (dm *DomainManager) NormalizeResourceID(input string) string {
 
 func (dm *DomainManager) isValidDomainName(name string) bool {
 	matched, _ := regexp.MatchString(DomainNamePattern, name)
-	return matched && len(name) <= 64
+	if !matched || len(name) <= 1 || len(name) > 64 {
+		return false
+	}
+	
+	// Reject purely numeric domain IDs
+	isNumeric, _ := regexp.MatchString(`^[0-9]+$`, name)
+	return !isNumeric
 }
 
 func (dm *DomainManager) uniqueStrings(slice []string) []string {

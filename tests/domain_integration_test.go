@@ -386,8 +386,7 @@ func TestDomainSearchScoping(t *testing.T) {
 		
 		// Should only return project1 results
 		for _, result := range results {
-			// Note: Domain would need to be added to search results or checked via resource lookup
-			assert.Contains(t, result.ID, "project1") // Assuming resource IDs contain domain info
+			assert.Equal(t, "project1", result.Domain, "Search result should be from project1 domain")
 		}
 	})
 
@@ -438,7 +437,19 @@ func TestDomainSearchScoping(t *testing.T) {
 		
 		// Check that results are related to team1
 		for _, result := range results {
-			assert.True(t, strings.Contains(result.Title, "team1") || strings.Contains(result.Content, "team1") || strings.Contains(result.ID, "team1"))
+			hasTeam1 := strings.Contains(result.Title, "team1") || 
+				strings.Contains(result.Content, "team1") || 
+				strings.Contains(result.ID, "team1")
+			
+			// Also check tags for team1
+			for _, tag := range result.Tags {
+				if strings.Contains(tag, "team1") {
+					hasTeam1 = true
+					break
+				}
+			}
+			
+			assert.True(t, hasTeam1, "Result should contain 'team1' in title, content, ID, or tags: %+v", result)
 		}
 	})
 
