@@ -1,0 +1,505 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.2.3)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+        - release
+        - prerelease
+      release_notes:
+        description: 'Release notes (optional)'
+        required: false
+        type: string
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Validate version format
+      id: validate
+      run: |
+        VERSION="${{ github.event.inputs.version }}"
+        
+        # Ensure version starts with 'v'
+        if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+          echo "ERROR: Invalid version format: $VERSION"
+          echo "Version must follow format: v1.2.3 or v1.2.3-beta"
+          exit 1
+        fi
+        
+        # Check if tag already exists
+        if git tag | grep -q "^${VERSION}$"; then
+          echo "ERROR: Tag $VERSION already exists!"
+          exit 1
+        fi
+        
+        # Get the latest tag to compare versions
+        LATEST_TAG=$(git tag --sort=-version:refname | head -n1)
+        
+        if [ -n "$LATEST_TAG" ]; then
+          echo "Latest existing tag: $LATEST_TAG"
+          echo "New version: $VERSION"
+          
+          # Remove 'v' prefix for comparison
+          LATEST_VERSION=${LATEST_TAG#v}
+          NEW_VERSION=${VERSION#v}
+          
+          # Split versions into components
+          IFS='.' read -ra LATEST_PARTS <<< "${LATEST_VERSION%-*}"
+          IFS='.' read -ra NEW_PARTS <<< "${NEW_VERSION%-*}"
+          
+          LATEST_MAJOR=${LATEST_PARTS[0]}
+          LATEST_MINOR=${LATEST_PARTS[1]}
+          LATEST_PATCH=${LATEST_PARTS[2]}
+          
+          NEW_MAJOR=${NEW_PARTS[0]}
+          NEW_MINOR=${NEW_PARTS[1]}
+          NEW_PATCH=${NEW_PARTS[2]}
+          
+          # Check for version progression
+          VERSION_VALID=false
+          
+          # Major version increase
+          if [ "$NEW_MAJOR" -gt "$LATEST_MAJOR" ]; then
+            VERSION_VALID=true
+            echo "Valid major version bump: $LATEST_MAJOR -> $NEW_MAJOR"
+          # Same major, minor version increase
+          elif [ "$NEW_MAJOR" -eq "$LATEST_MAJOR" ] && [ "$NEW_MINOR" -gt "$LATEST_MINOR" ]; then
+            VERSION_VALID=true
+            echo "Valid minor version bump: $LATEST_MINOR -> $NEW_MINOR"
+          # Same major.minor, patch version increase
+          elif [ "$NEW_MAJOR" -eq "$LATEST_MAJOR" ] && [ "$NEW_MINOR" -eq "$LATEST_MINOR" ] && [ "$NEW_PATCH" -gt "$LATEST_PATCH" ]; then
+            VERSION_VALID=true
+            echo "Valid patch version bump: $LATEST_PATCH -> $NEW_PATCH (security fix allowed)"
+          # Prerelease handling
+          elif [[ "$VERSION" =~ -[a-zA-Z0-9]+ ]]; then
+            # For prereleases, allow if base version is higher or equal
+            BASE_NEW="${NEW_VERSION%-*}"
+            BASE_LATEST="${LATEST_VERSION%-*}"
+            
+            # Compare base versions using sort
+            if [ "$(printf '%s\n' "$BASE_NEW" "$BASE_LATEST" | sort -V | tail -n1)" = "$BASE_NEW" ] && [ "$BASE_NEW" != "$BASE_LATEST" ]; then
+              VERSION_VALID=true
+              echo "Valid prerelease version: $VERSION"
+            elif [ "$BASE_NEW" = "$BASE_LATEST" ]; then
+              VERSION_VALID=true
+              echo "Valid prerelease for same base version: $VERSION"
+            fi
+          fi
+          
+          if [ "$VERSION_VALID" = false ]; then
+            echo "ERROR: Invalid version progression!"
+            echo "Cannot release $VERSION after $LATEST_TAG"
+            echo ""
+            echo "Valid version bumps from $LATEST_TAG:"
+            echo "  Patch (security fixes): v$LATEST_MAJOR.$LATEST_MINOR.$((LATEST_PATCH + 1))"
+            echo "  Minor (new features):   v$LATEST_MAJOR.$((LATEST_MINOR + 1)).0"
+            echo "  Major (breaking):       v$((LATEST_MAJOR + 1)).0.0"
+            echo "  Prerelease:             v$LATEST_MAJOR.$((LATEST_MINOR + 1)).0-alpha.1"
+            exit 1
+          fi
+        else
+          echo "No existing tags found, allowing first release"
+        fi
+        
+        echo "Version $VERSION is valid"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+    - name: Check if on main branch
+      run: |
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$CURRENT_BRANCH" != "main" ]; then
+          echo "ERROR: Releases can only be created from the main branch"
+          echo "Current branch: $CURRENT_BRANCH"
+          exit 1
+        fi
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests
+      run: go test -v -race ./...
+
+    - name: Run go vet
+      run: go vet ./...
+
+  build:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Primary platforms (most important)
+          - goos: linux
+            goarch: amd64
+            primary: true
+          - goos: linux
+            goarch: arm64
+            primary: true
+          - goos: darwin
+            goarch: amd64
+            primary: true
+          - goos: darwin
+            goarch: arm64
+            primary: true
+          - goos: windows
+            goarch: amd64
+            primary: true
+          
+          # Secondary platforms (common)
+          - goos: linux
+            goarch: 386
+          - goos: linux
+            goarch: arm
+          - goos: windows
+            goarch: 386
+          - goos: windows
+            goarch: arm64
+          - goos: freebsd
+            goarch: amd64
+          - goos: freebsd
+            goarch: arm64
+          - goos: openbsd
+            goarch: amd64
+          - goos: openbsd
+            goarch: arm64
+          
+          # Specialized platforms
+          - goos: linux
+            goarch: mips64le
+          - goos: linux
+            goarch: ppc64le
+          - goos: linux
+            goarch: riscv64
+          - goos: linux
+            goarch: s390x
+          - goos: netbsd
+            goarch: amd64
+          - goos: dragonfly
+            goarch: amd64
+          - goos: solaris
+            goarch: amd64
+          - goos: aix
+            goarch: ppc64
+          
+          # Mobile/embedded
+          - goos: android
+            goarch: arm64
+          - goos: android
+            goarch: amd64
+          
+          # WebAssembly
+          - goos: js
+            goarch: wasm
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Build binary
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        VERSION: ${{ needs.validate.outputs.version }}
+      run: |
+        # Create build directory
+        mkdir -p build
+        
+        # Set binary name with platform suffix
+        BINARY_NAME=mcp-mindport-${GOOS}-${GOARCH}
+        
+        # Handle special naming for different platforms
+        if [ "$GOOS" = "windows" ]; then
+          BINARY_NAME="${BINARY_NAME}.exe"
+        elif [ "$GOOS" = "js" ] && [ "$GOARCH" = "wasm" ]; then
+          BINARY_NAME="mcp-mindport.wasm"
+        fi
+        
+        # Set build flags based on platform
+        BUILD_FLAGS="-ldflags=-s -w -X main.Version=${VERSION} -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ) -X main.GitCommit=$(git rev-parse HEAD)"
+        
+        # Special handling for CGO-dependent platforms
+        export CGO_ENABLED=0
+        
+        # Handle special cases for certain platforms
+        if [ "$GOOS" = "android" ]; then
+          # Android builds might need different handling
+          export CGO_ENABLED=0
+        elif [ "$GOOS" = "js" ] && [ "$GOARCH" = "wasm" ]; then
+          # WebAssembly builds
+          export CGO_ENABLED=0
+        fi
+        
+        echo "Building for ${GOOS}/${GOARCH}..."
+        
+        # Build with version info
+        if go build ${BUILD_FLAGS} -o build/${BINARY_NAME} .; then
+          echo "Successfully built ${BINARY_NAME}"
+          
+          # Get file size
+          SIZE=$(ls -lh build/${BINARY_NAME} | awk '{print $5}')
+          echo "Binary size: ${SIZE}"
+          
+          # Create compressed archive (skip for WASM)
+          cd build
+          if [ "$GOOS" = "js" ] && [ "$GOARCH" = "wasm" ]; then
+            # For WASM, just compress the file
+            gzip -k ${BINARY_NAME}
+            ARCHIVE_NAME="${BINARY_NAME}.gz"
+          elif [ "$GOOS" = "windows" ]; then
+            zip ${BINARY_NAME%.*}.zip ${BINARY_NAME}
+            ARCHIVE_NAME="${BINARY_NAME%.*}.zip"
+          else
+            tar -czf ${BINARY_NAME}.tar.gz ${BINARY_NAME}
+            ARCHIVE_NAME="${BINARY_NAME}.tar.gz"
+          fi
+          
+          # Generate checksum
+          sha256sum ${ARCHIVE_NAME} > ${ARCHIVE_NAME}.sha256
+          
+          echo "Created archive: ${ARCHIVE_NAME}"
+        else
+          echo "ERROR: Build failed for ${GOOS}/${GOARCH}"
+          exit 1
+        fi
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-binaries-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: build/
+        retention-days: 7
+
+  docker:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [validate, test]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Log in to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: |
+          ${{ secrets.DOCKER_USERNAME }}/mcp-mindport
+          ghcr.io/${{ github.repository }}
+        tags: |
+          type=raw,value=${{ needs.validate.outputs.version }}
+          type=raw,value=latest
+
+    - name: Build and push Docker images
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        build-args: |
+          VERSION=${{ needs.validate.outputs.version }}
+          BUILD_TIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+          GIT_COMMIT=${{ github.sha }}
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, test, build, docker]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: artifacts
+
+    - name: Prepare release assets
+      run: |
+        mkdir -p release-assets
+        find artifacts -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" | while read file; do
+          cp "$file" release-assets/
+        done
+        
+        # List all assets
+        echo "Release assets:"
+        ls -la release-assets/
+
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Get the latest tag from the validation step
+        PREVIOUS_TAG="${{ needs.validate.outputs.latest_tag }}"
+        
+        if [ -z "$PREVIOUS_TAG" ]; then
+          echo "No previous tags found, generating full changelog"
+          CHANGELOG=$(git log --pretty=format:"* %s (%h)" --no-merges)
+        else
+          echo "Generating changelog since $PREVIOUS_TAG"
+          CHANGELOG=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"* %s (%h)" --no-merges)
+        fi
+        
+        # Save changelog to file to handle multiline content
+        echo "$CHANGELOG" > CHANGELOG.md
+        
+        # Also set as output (truncated for GitHub)
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" | head -20 >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ needs.validate.outputs.version }}
+        release_name: Release ${{ needs.validate.outputs.version }}
+        body: |
+          ## Release ${{ needs.validate.outputs.version }}
+          
+          ${{ github.event.inputs.release_notes }}
+          
+          ### Changes
+          ${{ steps.changelog.outputs.changelog }}
+          
+          ### Installation
+          
+          Download the appropriate binary for your platform from the assets below.
+          
+          #### Docker
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:${{ needs.validate.outputs.version }}
+          ```
+          
+          #### Verification
+          Verify the integrity of downloaded files using the provided SHA256 checksums:
+          ```bash
+          sha256sum -c <filename>.sha256
+          ```
+          
+          ### Full Changelog
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.previous_tag }}...${{ needs.validate.outputs.version }}
+        draft: false
+        prerelease: ${{ github.event.inputs.release_type == 'prerelease' }}
+
+    - name: Upload Release Assets
+      run: |
+        # Upload all release assets
+        for file in release-assets/*; do
+          if [ -f "$file" ]; then
+            echo "Uploading $(basename "$file")"
+            gh release upload ${{ needs.validate.outputs.version }} "$file"
+          fi
+        done
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update version in code
+      run: |
+        # Update version in main.go or version file if it exists
+        if [ -f "version.go" ]; then
+          sed -i 's/const Version = "[^"]*"/const Version = "${{ needs.validate.outputs.version }}"/' version.go
+        elif grep -q "var Version" main.go 2>/dev/null; then
+          sed -i 's/var Version = "[^"]*"/var Version = "${{ needs.validate.outputs.version }}"/' main.go
+        fi
+        
+        # Commit version update
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -A
+        if git diff --staged --quiet; then
+          echo "No version file changes to commit"
+        else
+          git commit -m "chore: bump version to ${{ needs.validate.outputs.version }}"
+          git push
+        fi
+
+    - name: Post-release notifications
+      run: |
+        echo "Release ${{ needs.validate.outputs.version }} has been created successfully!"
+        echo "Assets uploaded: $(ls release-assets/ | wc -l) files"
+        echo "Docker images pushed to Docker Hub and GHCR"
+        echo "Release URL: ${{ steps.create_release.outputs.html_url }}"

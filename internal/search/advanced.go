@@ -92,10 +92,10 @@ type SearchStats struct {
 func (s *BleveSearch) AdvancedSearch(ctx context.Context, query *AdvancedSearchQuery) ([]*AdvancedSearchResult, *SearchStats, error) {
 	startTime := time.Now()
 	
-	if query.Limit == 0 {
+	if query.Limit <= 0 {
 		query.Limit = 20
 	}
-	if query.SnippetLen == 0 {
+	if query.SnippetLen <= 0 {
 		query.SnippetLen = 200
 	}
 
@@ -143,26 +143,41 @@ func (s *BleveSearch) AdvancedSearch(ctx context.Context, query *AdvancedSearchQ
 func (s *BleveSearch) buildAdvancedQuery(query *AdvancedSearchQuery) (blevequery.Query, error) {
 	var baseQuery blevequery.Query
 	
-	switch query.Mode {
-	case "exact":
-		baseQuery = s.buildExactQuery(query)
-	case "fuzzy":
-		baseQuery = s.buildFuzzyQuery(query)
-	case "regex":
-		baseQuery = s.buildRegexQuery(query)
-	case "wildcard":
-		baseQuery = s.buildWildcardQuery(query)
-	case "semantic":
-		baseQuery = s.buildSemanticQuery(query)
-	default:
-		baseQuery = s.buildSmartQuery(query) // Auto-detect best mode
+	// If no query text, start with match all and only use filters
+	if strings.TrimSpace(query.Query) == "" {
+		baseQuery = bleve.NewMatchAllQuery()
+	} else {
+		switch query.Mode {
+		case "exact":
+			baseQuery = s.buildExactQuery(query)
+		case "fuzzy":
+			baseQuery = s.buildFuzzyQuery(query)
+		case "regex":
+			baseQuery = s.buildRegexQuery(query)
+		case "wildcard":
+			baseQuery = s.buildWildcardQuery(query)
+		case "semantic":
+			baseQuery = s.buildSemanticQuery(query)
+		default:
+			baseQuery = s.buildSmartQuery(query) // Auto-detect best mode
+		}
 	}
 
 	// Apply filters
 	filters := s.buildFilters(query)
 	if len(filters) > 0 {
-		filters = append(filters, baseQuery)
-		baseQuery = bleve.NewConjunctionQuery(filters...)
+		if strings.TrimSpace(query.Query) == "" {
+			// If no base query, use only filters
+			if len(filters) == 1 {
+				baseQuery = filters[0]
+			} else {
+				baseQuery = bleve.NewConjunctionQuery(filters...)
+			}
+		} else {
+			// Combine base query with filters
+			filters = append(filters, baseQuery)
+			baseQuery = bleve.NewConjunctionQuery(filters...)
+		}
 	}
 
 	return baseQuery, nil
@@ -303,7 +318,7 @@ func (s *BleveSearch) buildFilters(query *AdvancedSearchQuery) []blevequery.Quer
 	if len(query.Tags) > 0 {
 		tagQueries := []blevequery.Query{}
 		for _, tag := range query.Tags {
-			tagQuery := bleve.NewTermQuery(tag)
+			tagQuery := bleve.NewMatchQuery(tag)
 			tagQuery.SetField("tags")
 			tagQueries = append(tagQueries, tagQuery)
 		}

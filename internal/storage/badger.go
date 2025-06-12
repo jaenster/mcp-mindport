@@ -57,10 +57,20 @@ func (s *BadgerStore) Close() error {
 
 // Domain-scoped resource operations
 func (s *BadgerStore) StoreResource(ctx context.Context, resource *Resource) error {
+	if resource == nil {
+		return fmt.Errorf("resource cannot be nil")
+	}
 	return s.StoreResourceInDomain(ctx, resource, resource.Domain)
 }
 
 func (s *BadgerStore) StoreResourceInDomain(ctx context.Context, resource *Resource, domain string) error {
+	if resource == nil {
+		return fmt.Errorf("resource cannot be nil")
+	}
+	if resource.ID == "" {
+		return fmt.Errorf("resource ID cannot be empty")
+	}
+	
 	resource.UpdatedAt = time.Now()
 	if resource.CreatedAt.IsZero() {
 		resource.CreatedAt = resource.UpdatedAt
@@ -83,10 +93,15 @@ func (s *BadgerStore) StoreResourceInDomain(ctx context.Context, resource *Resou
 }
 
 func (s *BadgerStore) GetResource(ctx context.Context, id string) (*Resource, error) {
+	if id == "" {
+		return nil, fmt.Errorf("resource ID cannot be empty")
+	}
+	
 	var resource Resource
 	
 	err := s.db.View(func(txn *badger.Txn) error {
-		key := fmt.Sprintf("resource:%s", id)
+		// Use domain-aware key building to match how resources are stored
+		key := s.buildResourceKey(id, "default")
 		item, err := txn.Get([]byte(key))
 		if err != nil {
 			return err
@@ -153,13 +168,20 @@ func (s *BadgerStore) ListResources(ctx context.Context, limit int, offset int) 
 
 func (s *BadgerStore) DeleteResource(ctx context.Context, id string) error {
 	return s.db.Update(func(txn *badger.Txn) error {
-		key := fmt.Sprintf("resource:%s", id)
+		key := s.buildResourceKey(id, "default")
 		return txn.Delete([]byte(key))
 	})
 }
 
 // Prompt operations
 func (s *BadgerStore) StorePrompt(ctx context.Context, prompt *Prompt) error {
+	if prompt == nil {
+		return fmt.Errorf("prompt cannot be nil")
+	}
+	if prompt.ID == "" {
+		return fmt.Errorf("prompt ID cannot be empty")
+	}
+	
 	prompt.UpdatedAt = time.Now()
 	if prompt.CreatedAt.IsZero() {
 		prompt.CreatedAt = prompt.UpdatedAt

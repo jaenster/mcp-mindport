@@ -80,7 +80,7 @@ func (dm *DomainManager) createDefaultDomain() {
 		ID:          DefaultDomain,
 		Name:        "Default Domain",
 		Description: "Default domain for general resources",
-		Path:        DefaultDomain,
+		Path:        DomainSeparator + DefaultDomain,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 		Active:      true,
@@ -109,7 +109,7 @@ func (dm *DomainManager) CreateDomain(ctx context.Context, id, name, description
 		}
 		path = parentDomain.Path + DomainSeparator + id
 	} else {
-		path = id
+		path = DomainSeparator + id
 	}
 	
 	domain := &Domain{
@@ -168,12 +168,23 @@ func (dm *DomainManager) GetDomainScope(domainID string) (*DomainScope, error) {
 // getAncestry returns the parent hierarchy for a domain
 func (dm *DomainManager) getAncestry(domain *Domain) []string {
 	var ancestry []string
+	visited := make(map[string]bool)
 	current := domain
+	maxDepth := 50 // Prevent infinite loops
+	depth := 0
 	
-	for current.Parent != "" {
+	for current.Parent != "" && depth < maxDepth {
+		// Check for circular dependency
+		if visited[current.Parent] {
+			break
+		}
+		
 		ancestry = append([]string{current.Parent}, ancestry...)
+		visited[current.Parent] = true
+		
 		if parent, exists := dm.domains[current.Parent]; exists {
 			current = parent
+			depth++
 		} else {
 			break
 		}
@@ -215,21 +226,23 @@ func (dm *DomainManager) getSearchableDomains(domainID string) []string {
 
 // getHierarchicalSearchable returns searchable domains in hierarchical mode
 func (dm *DomainManager) getHierarchicalSearchable(domainID string) []string {
-	scope, _ := dm.GetDomainScope(domainID)
-	if scope == nil {
+	domain, exists := dm.domains[domainID]
+	if !exists {
 		return []string{domainID}
 	}
 	
 	searchable := []string{domainID}
 	
-	// Add ancestry (can search parent domains)
-	searchable = append(searchable, scope.Ancestry...)
+	// Add ancestry (can search parent domains) - use direct getAncestry to avoid circular dependency
+	ancestry := dm.getAncestry(domain)
+	searchable = append(searchable, ancestry...)
 	
 	// Add children (can search child domains)
-	searchable = append(searchable, scope.Children...)
+	children := dm.getChildren(domainID)
+	searchable = append(searchable, children...)
 	
 	// Add descendants recursively
-	for _, child := range scope.Children {
+	for _, child := range children {
 		descendants := dm.getDescendants(child)
 		searchable = append(searchable, descendants...)
 	}
@@ -239,12 +252,24 @@ func (dm *DomainManager) getHierarchicalSearchable(domainID string) []string {
 
 // getDescendants recursively gets all descendant domains
 func (dm *DomainManager) getDescendants(domainID string) []string {
+	return dm.getDescendantsWithVisited(domainID, make(map[string]bool), 0)
+}
+
+// getDescendantsWithVisited is a helper that tracks visited domains to prevent infinite recursion
+func (dm *DomainManager) getDescendantsWithVisited(domainID string, visited map[string]bool, depth int) []string {
 	var descendants []string
+	maxDepth := 50 // Prevent infinite loops
+	
+	if visited[domainID] || depth > maxDepth {
+		return descendants
+	}
+	
+	visited[domainID] = true
 	children := dm.getChildren(domainID)
 	
 	for _, child := range children {
 		descendants = append(descendants, child)
-		descendants = append(descendants, dm.getDescendants(child)...)
+		descendants = append(descendants, dm.getDescendantsWithVisited(child, visited, depth+1)...)
 	}
 	
 	return descendants

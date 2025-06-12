@@ -71,7 +71,7 @@ func createIndexMapping() mapping.IndexMapping {
 	contentFieldMapping.Index = true
 	
 	tagsFieldMapping := bleve.NewTextFieldMapping()
-	tagsFieldMapping.Analyzer = "keyword"
+	tagsFieldMapping.Analyzer = "standard"
 	tagsFieldMapping.Store = true
 	tagsFieldMapping.Index = true
 	
@@ -109,7 +109,7 @@ func (s *BleveSearch) IndexResource(ctx context.Context, resource *storage.Resou
 		"metadata":     resource.Metadata,
 	}
 
-	return s.index.Index(fmt.Sprintf("resource:%s", resource.ID), doc)
+	return s.index.Index(resource.ID, doc)
 }
 
 func (s *BleveSearch) IndexPrompt(ctx context.Context, prompt *storage.Prompt) error {
@@ -125,11 +125,11 @@ func (s *BleveSearch) IndexPrompt(ctx context.Context, prompt *storage.Prompt) e
 		"template":    prompt.Template,
 	}
 
-	return s.index.Index(fmt.Sprintf("prompt:%s", prompt.ID), doc)
+	return s.index.Index(prompt.ID, doc)
 }
 
 func (s *BleveSearch) RemoveFromIndex(ctx context.Context, id string, docType string) error {
-	return s.index.Delete(fmt.Sprintf("%s:%s", docType, id))
+	return s.index.Delete(id)
 }
 
 func (s *BleveSearch) Search(ctx context.Context, query *SearchQuery) ([]*SearchResult, error) {
@@ -271,8 +271,8 @@ func (s *BleveSearch) OptimizedSearch(ctx context.Context, query string, limit i
 	output.WriteString(fmt.Sprintf("Found %d results:\n\n", len(results)))
 
 	for i, result := range results {
-		output.WriteString(fmt.Sprintf("%d. [%s] %s (Score: %.2f)\n", 
-			i+1, result.Type, result.Title, result.Score))
+		output.WriteString(fmt.Sprintf("%d. [%s] %s (ID: %s, Score: %.2f)\n", 
+			i+1, result.Type, result.Title, result.ID, result.Score))
 		
 		if result.Snippet != "" {
 			output.WriteString(fmt.Sprintf("   %s\n", result.Snippet))

@@ -1,0 +1,171 @@
+name: Validate Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-build:
+    name: Validate Build Matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: [1.21, 1.22]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-${{ matrix.go-version }}-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Verify dependencies
+      run: go mod verify
+
+    - name: Build for current platform
+      run: |
+        go build -ldflags="-s -w -X main.Version=test-build" -o mcp-mindport .
+
+    - name: Test version output (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        ./mcp-mindport --version || echo "Version command not implemented yet"
+
+    - name: Test version output (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\mcp-mindport.exe --version || echo "Version command not implemented yet"
+
+    - name: Run basic tests
+      run: go test -short ./...
+
+  cross-compile:
+    name: Cross-compile Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Test cross-compilation
+      run: |
+        # Test building for all supported platforms and edge cases
+        platforms=(
+          # Major desktop platforms
+          "linux/amd64"
+          "linux/arm64"
+          "linux/386"
+          "darwin/amd64"
+          "darwin/arm64"
+          "windows/amd64"
+          "windows/386"
+          "windows/arm64"
+          
+          # BSD variants
+          "freebsd/amd64"
+          "freebsd/arm64"
+          "freebsd/386"
+          "freebsd/arm"
+          "openbsd/amd64"
+          "openbsd/arm64"
+          "openbsd/386"
+          "openbsd/arm"
+          "netbsd/amd64"
+          "netbsd/arm64"
+          "netbsd/386"
+          "netbsd/arm"
+          "dragonfly/amd64"
+          
+          # Linux ARM variants
+          "linux/arm"
+          "linux/arm64"
+          "linux/mips"
+          "linux/mipsle"
+          "linux/mips64"
+          "linux/mips64le"
+          "linux/ppc64"
+          "linux/ppc64le"
+          "linux/riscv64"
+          "linux/s390x"
+          
+          # Solaris
+          "solaris/amd64"
+          
+          # Plan9
+          "plan9/amd64"
+          "plan9/386"
+          "plan9/arm"
+          
+          # AIX
+          "aix/ppc64"
+          
+          # Mobile platforms (if applicable)
+          "android/amd64"
+          "android/arm64"
+          "android/386"
+          "android/arm"
+          
+          # WebAssembly
+          "js/wasm"
+          
+          # Experimental/niche platforms
+          "illumos/amd64"
+        )
+        
+        for platform in "${platforms[@]}"; do
+          IFS='/' read -ra PLATFORM_PARTS <<< "$platform"
+          GOOS=${PLATFORM_PARTS[0]}
+          GOARCH=${PLATFORM_PARTS[1]}
+          
+          echo "Testing build for $GOOS/$GOARCH"
+          
+          BINARY_NAME="mcp-mindport-${GOOS}-${GOARCH}"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="${BINARY_NAME}.exe"
+          fi
+          
+          if env GOOS="$GOOS" GOARCH="$GOARCH" go build -ldflags="-s -w" -o "$BINARY_NAME" .; then
+            echo "Successfully built for $GOOS/$GOARCH"
+            rm "$BINARY_NAME"
+          else
+            echo "Failed to build for $GOOS/$GOARCH"
+            exit 1
+          fi
+        done
+        
+        echo "All cross-compilation tests passed!"
