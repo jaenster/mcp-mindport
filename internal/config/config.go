@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/viper"
 )
@@ -81,11 +80,11 @@ func Load(configFile string) (*Config, error) {
 	}
 
 	// Ensure directories exist
-	if err := os.MkdirAll(filepath.Dir(config.Storage.Path), 0755); err != nil {
+	if err := os.MkdirAll(config.Storage.Path, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(config.Search.IndexPath), 0755); err != nil {
+	if err := os.MkdirAll(config.Search.IndexPath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create search index directory: %w", err)
 	}
 

@@ -92,32 +92,65 @@ func (s *Server) Start(ctx context.Context) error {
 	decoder := json.NewDecoder(os.Stdin)
 	encoder := json.NewEncoder(os.Stdout)
 
+	log.Printf("MCP server starting stdio transport")
+
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("MCP server context cancelled")
 			return ctx.Err()
 		default:
 			var request MCPRequest
 			if err := decoder.Decode(&request); err != nil {
 				if err == io.EOF {
+					log.Printf("MCP server received EOF, shutting down")
 					return nil
 				}
 				log.Printf("Failed to decode request: %v", err)
 				continue
 			}
 
+			log.Printf("MCP server received request: method=%s id=%v", request.Method, request.ID)
+
 			response := s.HandleRequest(ctx, &request)
-			if err := encoder.Encode(response); err != nil {
-				log.Printf("Failed to encode response: %v", err)
+			
+			// Don't send response for notifications (response will be nil)
+			if response != nil {
+				log.Printf("MCP server sending response: id=%v error=%v", response.ID, response.Error != nil)
+				
+				if err := encoder.Encode(response); err != nil {
+					log.Printf("Failed to encode response: %v", err)
+					// Don't continue on encoding errors - this might indicate client disconnect
+					return fmt.Errorf("response encoding failed: %v", err)
+				}
+				
+				// Flush output to ensure response is sent immediately
+				if err := os.Stdout.Sync(); err != nil {
+					log.Printf("Failed to flush stdout: %v", err)
+				}
+			} else {
+				log.Printf("No response sent for notification/invalid request")
 			}
 		}
 	}
+}
+
+// getValidID ensures we have a proper ID for JSON-RPC responses
+func getValidID(requestID interface{}) interface{} {
+	if requestID == nil {
+		return 0 // Default for null IDs
+	}
+	return requestID
 }
 
 func (s *Server) HandleRequest(ctx context.Context, request *MCPRequest) *MCPResponse {
 	switch request.Method {
 	case "initialize":
 		return s.handleInitialize(request)
+	case "notifications/initialized":
+		// This is a notification - no response should be sent
+		log.Printf("Received initialized notification")
+		return nil
 	case "resources/list":
 		return s.handleResourcesList(ctx, request)
 	case "resources/read":
@@ -131,9 +164,14 @@ func (s *Server) HandleRequest(ctx context.Context, request *MCPRequest) *MCPRes
 	case "prompts/get":
 		return s.handlePromptsGet(ctx, request)
 	default:
+		// Only send error response if this is not a notification (has an ID)
+		if request.ID == nil {
+			log.Printf("Ignoring unknown notification: %s", request.Method)
+			return nil
+		}
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32601,
 				Message: "Method not found",
@@ -143,25 +181,45 @@ func (s *Server) HandleRequest(ctx context.Context, request *MCPRequest) *MCPRes
 }
 
 func (s *Server) handleInitialize(request *MCPRequest) *MCPResponse {
-	return &MCPResponse{
-		JSONRPC: "2.0",
-		ID:      request.ID,
-		Result: InitializeResult{
-			ProtocolVersion: "2024-11-05",
-			Capabilities: map[string]interface{}{
-				"resources": map[string]interface{}{
-					"subscribe":   true,
-					"listChanged": true,
-				},
-				"tools": map[string]interface{}{},
-				"prompts": map[string]interface{}{},
+	// Enhanced initialize handling for Claude Code compatibility
+	log.Printf("Handling initialize request from client")
+	
+	// Extract client info for debugging
+	if params, ok := request.Params.(map[string]interface{}); ok {
+		if clientInfo, ok := params["clientInfo"].(map[string]interface{}); ok {
+			if name, ok := clientInfo["name"].(string); ok {
+				log.Printf("Client name: %s", name)
+			}
+		}
+		if version, ok := params["protocolVersion"].(string); ok {
+			log.Printf("Client protocol version: %s", version)
+		}
+	}
+
+	result := InitializeResult{
+		ProtocolVersion: "2024-11-05",
+		Capabilities: map[string]interface{}{
+			"resources": map[string]interface{}{
+				"subscribe":   true,
+				"listChanged": true,
 			},
-			ServerInfo: ServerInfo{
-				Name:    "mcp-mindport",
-				Version: "1.0.0",
-			},
+			"tools": map[string]interface{}{},
+			"prompts": map[string]interface{}{},
+		},
+		ServerInfo: ServerInfo{
+			Name:    "mcp-mindport",
+			Version: "1.0.0",
 		},
 	}
+
+	response := &MCPResponse{
+		JSONRPC: "2.0",
+		ID:      getValidID(request.ID),
+		Result:  result,
+	}
+
+	log.Printf("Initialize response prepared successfully")
+	return response
 }
 
 func (s *Server) handleResourcesList(ctx context.Context, request *MCPRequest) *MCPResponse {
@@ -169,7 +227,7 @@ func (s *Server) handleResourcesList(ctx context.Context, request *MCPRequest) *
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Internal error",
@@ -190,7 +248,7 @@ func (s *Server) handleResourcesList(ctx context.Context, request *MCPRequest) *
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"resources": mcpResources,
 		},
@@ -202,7 +260,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Invalid params",
@@ -214,7 +272,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "URI is required",
@@ -227,7 +285,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 	if len(parts) < 4 || parts[0] != "mindport:" || parts[2] != "resource" {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Invalid URI format",
@@ -239,7 +297,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 	if resourceID == "" {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Invalid URI format",
@@ -253,7 +311,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Resource not found",
@@ -264,7 +322,7 @@ func (s *Server) handleResourcesRead(ctx context.Context, request *MCPRequest) *
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"contents": []map[string]interface{}{
 				{
@@ -689,7 +747,7 @@ func (s *Server) handleToolsList(request *MCPRequest) *MCPResponse {
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"tools": tools,
 		},
@@ -701,7 +759,7 @@ func (s *Server) handleToolsCall(ctx context.Context, request *MCPRequest) *MCPR
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Invalid params",
@@ -713,7 +771,7 @@ func (s *Server) handleToolsCall(ctx context.Context, request *MCPRequest) *MCPR
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Tool name is required",
@@ -756,7 +814,7 @@ func (s *Server) handleToolsCall(ctx context.Context, request *MCPRequest) *MCPR
 	default:
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32601,
 				Message: "Tool not found",
@@ -770,7 +828,7 @@ func (s *Server) handleStoreResource(ctx context.Context, request *MCPRequest, a
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Title is required",
@@ -782,7 +840,7 @@ func (s *Server) handleStoreResource(ctx context.Context, request *MCPRequest, a
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Content is required",
@@ -821,7 +879,7 @@ func (s *Server) handleStoreResource(ctx context.Context, request *MCPRequest, a
 	if err := s.storage.StoreResourceInDomain(ctx, resource, resource.Domain); err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Failed to store resource",
@@ -837,7 +895,7 @@ func (s *Server) handleStoreResource(ctx context.Context, request *MCPRequest, a
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -854,7 +912,7 @@ func (s *Server) handleSearchResources(ctx context.Context, request *MCPRequest,
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Query is required",
@@ -872,7 +930,7 @@ func (s *Server) handleSearchResources(ctx context.Context, request *MCPRequest,
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Search failed",
@@ -883,7 +941,7 @@ func (s *Server) handleSearchResources(ctx context.Context, request *MCPRequest,
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -900,7 +958,7 @@ func (s *Server) handleStorePrompt(ctx context.Context, request *MCPRequest, arg
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Name is required",
@@ -912,7 +970,7 @@ func (s *Server) handleStorePrompt(ctx context.Context, request *MCPRequest, arg
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Template is required",
@@ -956,7 +1014,7 @@ func (s *Server) handleStorePrompt(ctx context.Context, request *MCPRequest, arg
 	if err := s.storage.StorePromptInDomain(ctx, prompt, prompt.Domain); err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Failed to store prompt",
@@ -972,7 +1030,7 @@ func (s *Server) handleStorePrompt(ctx context.Context, request *MCPRequest, arg
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -989,7 +1047,7 @@ func (s *Server) handlePromptsList(ctx context.Context, request *MCPRequest) *MC
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Internal error",
@@ -1018,7 +1076,7 @@ func (s *Server) handlePromptsList(ctx context.Context, request *MCPRequest) *MC
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"prompts": mcpPrompts,
 		},
@@ -1030,7 +1088,7 @@ func (s *Server) handlePromptsGet(ctx context.Context, request *MCPRequest) *MCP
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Invalid params",
@@ -1042,7 +1100,7 @@ func (s *Server) handlePromptsGet(ctx context.Context, request *MCPRequest) *MCP
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Name is required",
@@ -1055,7 +1113,7 @@ func (s *Server) handlePromptsGet(ctx context.Context, request *MCPRequest) *MCP
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Internal error",
@@ -1075,7 +1133,7 @@ func (s *Server) handlePromptsGet(ctx context.Context, request *MCPRequest) *MCP
 	if foundPrompt == nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Prompt not found",
@@ -1095,7 +1153,7 @@ func (s *Server) handlePromptsGet(ctx context.Context, request *MCPRequest) *MCP
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"description": foundPrompt.Description,
 			"messages": []map[string]interface{}{
@@ -1117,7 +1175,7 @@ func (s *Server) handleAdvancedSearch(ctx context.Context, request *MCPRequest, 
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Query is required",
@@ -1186,7 +1244,7 @@ func (s *Server) handleAdvancedSearch(ctx context.Context, request *MCPRequest, 
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Advanced search failed",
@@ -1230,7 +1288,7 @@ func (s *Server) handleAdvancedSearch(ctx context.Context, request *MCPRequest, 
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1248,7 +1306,7 @@ func (s *Server) handleGrep(ctx context.Context, request *MCPRequest, args map[s
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Pattern is required",
@@ -1305,7 +1363,7 @@ func (s *Server) handleGrep(ctx context.Context, request *MCPRequest, args map[s
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Grep search failed",
@@ -1336,7 +1394,7 @@ func (s *Server) handleGrep(ctx context.Context, request *MCPRequest, args map[s
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1394,7 +1452,7 @@ func (s *Server) handleFind(ctx context.Context, request *MCPRequest, args map[s
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Find search failed",
@@ -1421,7 +1479,7 @@ func (s *Server) handleFind(ctx context.Context, request *MCPRequest, args map[s
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1439,7 +1497,7 @@ func (s *Server) handleRipgrep(ctx context.Context, request *MCPRequest, args ma
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Pattern is required",
@@ -1504,7 +1562,7 @@ func (s *Server) handleRipgrep(ctx context.Context, request *MCPRequest, args ma
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Ripgrep search failed",
@@ -1537,7 +1595,7 @@ func (s *Server) handleRipgrep(ctx context.Context, request *MCPRequest, args ma
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1556,7 +1614,7 @@ func (s *Server) handleCreateDomain(ctx context.Context, request *MCPRequest, ar
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Domain ID is required",
@@ -1568,7 +1626,7 @@ func (s *Server) handleCreateDomain(ctx context.Context, request *MCPRequest, ar
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Domain name is required",
@@ -1583,7 +1641,7 @@ func (s *Server) handleCreateDomain(ctx context.Context, request *MCPRequest, ar
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Failed to create domain",
@@ -1594,7 +1652,7 @@ func (s *Server) handleCreateDomain(ctx context.Context, request *MCPRequest, ar
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1638,7 +1696,7 @@ func (s *Server) handleListDomains(ctx context.Context, request *MCPRequest, arg
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1655,7 +1713,7 @@ func (s *Server) handleSwitchDomain(ctx context.Context, request *MCPRequest, ar
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Domain ID is required",
@@ -1667,7 +1725,7 @@ func (s *Server) handleSwitchDomain(ctx context.Context, request *MCPRequest, ar
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Failed to switch domain",
@@ -1681,7 +1739,7 @@ func (s *Server) handleSwitchDomain(ctx context.Context, request *MCPRequest, ar
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Domain switched but failed to get info",
@@ -1692,7 +1750,7 @@ func (s *Server) handleSwitchDomain(ctx context.Context, request *MCPRequest, ar
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1715,7 +1773,7 @@ func (s *Server) handleDomainStats(ctx context.Context, request *MCPRequest, arg
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Domain not found",
@@ -1729,7 +1787,7 @@ func (s *Server) handleDomainStats(ctx context.Context, request *MCPRequest, arg
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Failed to get domain scope",
@@ -1743,7 +1801,7 @@ func (s *Server) handleDomainStats(ctx context.Context, request *MCPRequest, arg
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Failed to get domain statistics",
@@ -1782,7 +1840,7 @@ func (s *Server) handleDomainStats(ctx context.Context, request *MCPRequest, arg
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1801,7 +1859,7 @@ func (s *Server) handleGetResource(ctx context.Context, request *MCPRequest, arg
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Resource ID is required",
@@ -1817,7 +1875,7 @@ func (s *Server) handleGetResource(ctx context.Context, request *MCPRequest, arg
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Resource not found",
@@ -1846,7 +1904,7 @@ func (s *Server) handleGetResource(ctx context.Context, request *MCPRequest, arg
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -1863,7 +1921,7 @@ func (s *Server) handleGetPrompt(ctx context.Context, request *MCPRequest, args 
 	if !ok {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32602,
 				Message: "Prompt ID is required",
@@ -1879,7 +1937,7 @@ func (s *Server) handleGetPrompt(ctx context.Context, request *MCPRequest, args 
 	if err != nil {
 		return &MCPResponse{
 			JSONRPC: "2.0",
-			ID:      request.ID,
+			ID:      getValidID(request.ID),
 			Error: &MCPError{
 				Code:    -32603,
 				Message: "Prompt not found",
@@ -1914,7 +1972,7 @@ func (s *Server) handleGetPrompt(ctx context.Context, request *MCPRequest, args 
 
 	return &MCPResponse{
 		JSONRPC: "2.0",
-		ID:      request.ID,
+		ID:      getValidID(request.ID),
 		Result: map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
