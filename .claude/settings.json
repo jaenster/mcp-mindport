@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mindport": {
+      "type": "stdio", 
+      "command": "/Users/jaenster/.local/bin/mcp-mindport",
+      "args": ["--config", "/Users/jaenster/.config/mindport/config.yaml", "--log", "/tmp/mindport-claude-debug.log"],
+      "env": {
+        "MCP_MINDPORT_CONFIG": "/Users/jaenster/.config/mindport/config.yaml",
+        "MCP_MINDPORT_LOG": "/tmp/mindport-claude-debug.log"
+      },
+      "protocolVersion": "2024-11-05"
+    }
+  }
+}

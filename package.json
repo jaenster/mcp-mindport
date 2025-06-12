@@ -1,0 +1,40 @@
+{
+  "name": "mcp-mindport",
+  "version": "1.0.0",
+  "description": "MindPort - MCP Resource Server with optimized search capabilities",
+  "main": "src/index.ts",
+  "bin": {
+    "mcp-mindport": "src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "build": "tsc",
+    "start": "ts-node index.ts",
+    "dev": "ts-node index.ts"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "search",
+    "storage"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "commander": "^12.0.0",
+    "fuse.js": "^7.0.0",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/sqlite3": "^3.1.11",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0"
+  }
+}

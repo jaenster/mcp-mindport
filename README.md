@@ -13,7 +13,29 @@ A high-performance Model Context Protocol (MCP) resource server built in Go, des
 
 ## Quick Start
 
-### Build and Run
+### For Claude Code CLI Users
+
+```bash
+# Quick setup (recommended)
+./claude-code-setup.sh
+
+# Start daemon
+mcp-mindport --daemon &
+
+# Claude Code will automatically use MindPort via environment variables
+```
+
+### For Claude Desktop Users
+
+```bash
+# Full installation with Claude Desktop integration
+./install.sh
+
+# Follow prompts to configure Claude Desktop
+# Restart Claude Desktop to load MindPort
+```
+
+### Manual Build and Run
 
 ```bash
 # Clone and build

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mindport": {
+      "type": "stdio",
+      "command": "mcp-mindport",
+      "args": ["--config", "~/.config/mindport/config.yaml"],
+      "env": {
+        "MCP_MINDPORT_CONFIG": "~/.config/mindport/config.yaml"
+      },
+      "protocolVersion": "2024-11-05"
+    }
+  }
+}
