@@ -408,6 +408,11 @@ func (s *Server) handleToolsList(request *MCPRequest) *MCPResponse {
 						"type":        "boolean",
 						"description": "Highlight matches",
 					},
+					"domains": map[string]interface{}{
+						"type":        "array",
+						"items":       map[string]interface{}{"type": "string"},
+						"description": "Filter by domains",
+					},
 				},
 				"required": []string{"query"},
 			},
@@ -459,6 +464,11 @@ func (s *Server) handleToolsList(request *MCPRequest) *MCPResponse {
 						"description": "Maximum matches (like grep -m)",
 						"default":     1000,
 					},
+					"domains": map[string]interface{}{
+						"type":        "array",
+						"items":       map[string]interface{}{"type": "string"},
+						"description": "Filter by domains",
+					},
 				},
 				"required": []string{"pattern"},
 			},
@@ -494,6 +504,11 @@ func (s *Server) handleToolsList(request *MCPRequest) *MCPResponse {
 						"type":        "integer",
 						"description": "Maximum results",
 						"default":     1000,
+					},
+					"domains": map[string]interface{}{
+						"type":        "array",
+						"items":       map[string]interface{}{"type": "string"},
+						"description": "Filter by domains",
 					},
 				},
 			},
@@ -548,6 +563,11 @@ func (s *Server) handleToolsList(request *MCPRequest) *MCPResponse {
 						"type":        "array",
 						"items":       map[string]interface{}{"type": "string"},
 						"description": "Filter by type (like rg -t)",
+					},
+					"domains": map[string]interface{}{
+						"type":        "array",
+						"items":       map[string]interface{}{"type": "string"},
+						"description": "Filter by domains",
 					},
 				},
 				"required": []string{"pattern"},
@@ -1136,6 +1156,15 @@ func (s *Server) handleAdvancedSearch(ctx context.Context, request *MCPRequest, 
 			}
 		}
 	}
+	
+	// Handle domains
+	if domainsInterface, ok := args["domains"].([]interface{}); ok {
+		for _, domain := range domainsInterface {
+			if domainStr, ok := domain.(string); ok {
+				searchQuery.Domains = append(searchQuery.Domains, domainStr)
+			}
+		}
+	}
 
 	// Perform search
 	results, stats, err := s.searchEngine.AdvancedSearch(ctx, searchQuery)
@@ -1246,6 +1275,15 @@ func (s *Server) handleGrep(ctx context.Context, request *MCPRequest, args map[s
 	if maxMatches, ok := args["max_matches"].(float64); ok {
 		opts.MaxMatches = int(maxMatches)
 	}
+	
+	// Handle domain filtering
+	if domainsInterface, ok := args["domains"].([]interface{}); ok {
+		for _, domain := range domainsInterface {
+			if domainStr, ok := domain.(string); ok {
+				opts.Domains = append(opts.Domains, domainStr)
+			}
+		}
+	}
 
 	// Perform grep search
 	results, err := s.cliTools.Grep(ctx, opts)
@@ -1323,6 +1361,15 @@ func (s *Server) handleFind(ctx context.Context, request *MCPRequest, args map[s
 		for _, tag := range tagsInterface {
 			if tagStr, ok := tag.(string); ok {
 				opts.Tags = append(opts.Tags, tagStr)
+			}
+		}
+	}
+	
+	// Handle domain filtering
+	if domainsInterface, ok := args["domains"].([]interface{}); ok {
+		for _, domain := range domainsInterface {
+			if domainStr, ok := domain.(string); ok {
+				opts.Domains = append(opts.Domains, domainStr)
 			}
 		}
 	}
@@ -1424,6 +1471,15 @@ func (s *Server) handleRipgrep(ctx context.Context, request *MCPRequest, args ma
 		for _, t := range typeInterface {
 			if typeStr, ok := t.(string); ok {
 				opts.Type = append(opts.Type, typeStr)
+			}
+		}
+	}
+	
+	// Handle domain filtering
+	if domainsInterface, ok := args["domains"].([]interface{}); ok {
+		for _, domain := range domainsInterface {
+			if domainStr, ok := domain.(string); ok {
+				opts.Domains = append(opts.Domains, domainStr)
 			}
 		}
 	}

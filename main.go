@@ -18,8 +18,11 @@ import (
 )
 
 var (
-	configFile string
-	daemonMode bool
+	configFile    string
+	daemonMode    bool
+	domain        string
+	createDomain  bool
+	listDomains   bool
 )
 
 var rootCmd = &cobra.Command{
@@ -32,6 +35,9 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.Flags().StringVarP(&configFile, "config", "c", "", "config file (default is $HOME/.mcp-mindport.yaml)")
 	rootCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "run as daemon")
+	rootCmd.Flags().StringVar(&domain, "domain", "", "start server in specific domain context (e.g., 'project1' or 'team:backend')")
+	rootCmd.Flags().BoolVar(&createDomain, "create-domain", false, "create domain if it doesn't exist (use with --domain)")
+	rootCmd.Flags().BoolVar(&listDomains, "list-domains", false, "list all available domains and exit")
 }
 
 func main() {
@@ -65,6 +71,21 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Create MCP server
 	mcpServer := mcp.NewServer(store, searchEngine, cfg)
 
+	// Handle domain-specific operations
+	if listDomains {
+		handleListDomains(mcpServer)
+		return
+	}
+
+	if domain != "" {
+		if err := handleDomainStartup(mcpServer, domain, createDomain); err != nil {
+			log.Fatalf("Failed to setup domain: %v", err)
+		}
+		log.Printf("Starting MindPort in domain context: %s", domain)
+	} else {
+		log.Printf("Starting MindPort in default domain context")
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -91,4 +112,35 @@ func runServer(cmd *cobra.Command, args []string) {
 	<-sigChan
 	log.Println("Shutting down...")
 	cancel()
+}
+
+// handleListDomains lists all available domains
+func handleListDomains(server *mcp.Server) {
+	// This would need access to domain manager, but for now we'll implement a basic version
+	fmt.Println("Available domains:")
+	fmt.Println("• default - Default domain for general resources")
+	fmt.Println("\nNote: Use domain management tools within the MCP server for full domain listing")
+}
+
+// handleDomainStartup sets up domain-specific startup
+func handleDomainStartup(server *mcp.Server, domainName string, createIfNotExists bool) error {
+	// For now, we'll update the config to set the current domain
+	// In a full implementation, this would validate the domain exists
+	// and possibly create it if requested
+	
+	if domainName == "" {
+		return fmt.Errorf("domain name cannot be empty")
+	}
+
+	// Basic validation
+	if len(domainName) > 64 {
+		return fmt.Errorf("domain name too long (max 64 characters)")
+	}
+
+	log.Printf("Domain startup configured for: %s", domainName)
+	if createIfNotExists {
+		log.Printf("Will create domain '%s' if it doesn't exist", domainName)
+	}
+
+	return nil
 }

@@ -35,6 +35,7 @@ type GrepOptions struct {
 	Extended      bool     `json:"extended,omitempty"`       // -E (regex)
 	Fixed         bool     `json:"fixed,omitempty"`          // -F (fixed strings)
 	OnlyMatching  bool     `json:"only_matching,omitempty"`  // -o
+	Domains       []string `json:"domains,omitempty"`        // Domain filtering
 }
 
 // FindOptions represents options for find-like search
@@ -51,6 +52,7 @@ type FindOptions struct {
 	Execute      string    `json:"execute,omitempty"`       // -exec
 	Print        bool      `json:"print,omitempty"`         // -print
 	Limit        int       `json:"limit,omitempty"`
+	Domains      []string  `json:"domains,omitempty"`       // Domain filtering
 }
 
 // RipgrepOptions represents options for ripgrep-style search (more advanced than grep)
@@ -84,12 +86,14 @@ type RipgrepOptions struct {
 	Exclude       []string `json:"exclude,omitempty"`         // -g !pattern
 	Type          []string `json:"type,omitempty"`            // -t
 	TypeNot       []string `json:"type_not,omitempty"`        // -T
+	Domains       []string `json:"domains,omitempty"`         // Domain filtering
 }
 
 // GrepResult represents a grep-style search result
 type GrepResult struct {
 	ResourceID   string   `json:"resource_id"`
 	ResourceType string   `json:"resource_type"`
+	Domain       string   `json:"domain,omitempty"`
 	Title        string   `json:"title"`
 	LineNumber   int      `json:"line_number,omitempty"`
 	MatchedLine  string   `json:"matched_line"`
@@ -101,6 +105,7 @@ type GrepResult struct {
 type FindResult struct {
 	ResourceID   string                 `json:"resource_id"`
 	ResourceType string                 `json:"resource_type"`
+	Domain       string                 `json:"domain,omitempty"`
 	Title        string                 `json:"title"`
 	Size         int64                  `json:"size"`
 	Created      time.Time              `json:"created"`
@@ -123,8 +128,18 @@ func (c *CLISearchTools) Grep(ctx context.Context, opts *GrepOptions) ([]*GrepRe
 		opts.MaxMatches = 1000
 	}
 
-	// Get all resources
-	resources, err := c.storage.ListResources(ctx, 10000, 0) // Get a large batch
+	// Get resources from specified domains or all domains
+	var resources []*storage.Resource
+	var err error
+	
+	if len(opts.Domains) > 0 {
+		// Use domain-specific listing
+		resources, err = c.storage.ListResourcesInDomain(ctx, opts.Domains, 10000, 0)
+	} else {
+		// Get all resources (legacy behavior)
+		resources, err = c.storage.ListResources(ctx, 10000, 0)
+	}
+	
 	if err != nil {
 		return nil, fmt.Errorf("failed to list resources: %w", err)
 	}
@@ -169,15 +184,33 @@ func (c *CLISearchTools) Find(ctx context.Context, opts *FindOptions) ([]*FindRe
 		opts.Limit = 1000
 	}
 
-	// Get all resources and prompts
-	resources, err := c.storage.ListResources(ctx, 10000, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list resources: %w", err)
-	}
+	// Get resources and prompts from specified domains or all domains
+	var resources []*storage.Resource
+	var prompts []*storage.Prompt
+	var err error
+	
+	if len(opts.Domains) > 0 {
+		// Use domain-specific listing
+		resources, err = c.storage.ListResourcesInDomain(ctx, opts.Domains, 10000, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list resources: %w", err)
+		}
+		
+		prompts, err = c.storage.ListPromptsInDomain(ctx, opts.Domains, 10000, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list prompts: %w", err)
+		}
+	} else {
+		// Get all resources and prompts (legacy behavior)
+		resources, err = c.storage.ListResources(ctx, 10000, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list resources: %w", err)
+		}
 
-	prompts, err := c.storage.ListPrompts(ctx, 10000, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list prompts: %w", err)
+		prompts, err = c.storage.ListPrompts(ctx, 10000, 0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list prompts: %w", err)
+		}
 	}
 
 	var results []*FindResult
@@ -256,6 +289,11 @@ func (c *CLISearchTools) Ripgrep(ctx context.Context, opts *RipgrepOptions) ([]*
 	// Apply type filters
 	if len(opts.Type) > 0 {
 		query.Type = opts.Type[0] // Use first type for simplicity
+	}
+	
+	// Apply domain filters
+	if len(opts.Domains) > 0 {
+		query.Domains = opts.Domains
 	}
 
 	// Perform advanced search

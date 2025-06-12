@@ -26,6 +26,7 @@ type AdvancedSearchQuery struct {
 	Type         string   `json:"type,omitempty"`         // "resource", "prompt"
 	Tags         []string `json:"tags,omitempty"`
 	ContentType  string   `json:"content_type,omitempty"` // "code", "documentation", "data", etc.
+	Domains      []string `json:"domains,omitempty"`      // Domain filtering
 	
 	// Date filters
 	CreatedAfter  *time.Time `json:"created_after,omitempty"`
