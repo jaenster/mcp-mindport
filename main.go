@@ -15,6 +15,7 @@ import (
 	"mcp-mindport/internal/storage"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -29,8 +30,14 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "mcp-mindport",
 	Short: "MindPort - MCP Resource Server with optimized search capabilities",
-	Long:  `MindPort: A Model Context Protocol server that provides optimized storage and search for AI systems`,
-	Run:   runServer,
+	Long: `MindPort: A Model Context Protocol server that provides optimized storage and search for AI systems
+
+Environment Variables:
+  MCP_MINDPORT_CONFIG         config file path
+  MCP_MINDPORT_DAEMON         run as daemon (true/false)
+  MCP_MINDPORT_DOMAIN         domain context
+  MCP_MINDPORT_DEFAULT_DOMAIN default domain name`,
+	Run: runServer,
 }
 
 func init() {
@@ -40,6 +47,16 @@ func init() {
 	rootCmd.Flags().BoolVar(&createDomain, "create-domain", false, "create domain if it doesn't exist (use with --domain)")
 	rootCmd.Flags().BoolVar(&listDomains, "list-domains", false, "list all available domains and exit")
 	rootCmd.Flags().StringVar(&defaultDomain, "default-domain", "", "set the default domain for the server (overrides config)")
+	
+	// Bind environment variables to flags
+	viper.SetEnvPrefix("MCP_MINDPORT")
+	viper.AutomaticEnv()
+	
+	// Map environment variables to flag names (only for configuration settings)
+	viper.BindPFlag("config", rootCmd.Flags().Lookup("config"))
+	viper.BindPFlag("daemon", rootCmd.Flags().Lookup("daemon"))
+	viper.BindPFlag("domain", rootCmd.Flags().Lookup("domain"))
+	viper.BindPFlag("default-domain", rootCmd.Flags().Lookup("default-domain"))
 }
 
 func main() {
@@ -50,13 +67,27 @@ func main() {
 }
 
 func runServer(cmd *cobra.Command, args []string) {
+	// Read environment variables if CLI flags not set (only for configuration settings)
+	if configFile == "" {
+		configFile = viper.GetString("config")
+	}
+	if !daemonMode {
+		daemonMode = viper.GetBool("daemon")
+	}
+	if domain == "" {
+		domain = viper.GetString("domain")
+	}
+	if defaultDomain == "" {
+		defaultDomain = viper.GetString("default-domain")
+	}
+
 	// Load configuration
 	cfg, err := config.Load(configFile)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Override default domain if specified via CLI
+	// Override default domain if specified via CLI or ENV
 	if defaultDomain != "" {
 		cfg.Domain.DefaultDomain = defaultDomain
 		log.Printf("Default domain set to: %s", defaultDomain)
