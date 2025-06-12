@@ -1,0 +1,15 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/domains/route": "app/api/domains/route.js",
+  "/api/prompts/[id]/route": "app/api/prompts/[id]/route.js",
+  "/api/resources/[id]/route": "app/api/resources/[id]/route.js",
+  "/api/prompts/route": "app/api/prompts/route.js",
+  "/api/resources/route": "app/api/resources/route.js",
+  "/api/stats/route": "app/api/stats/route.js",
+  "/page": "app/page.js",
+  "/prompts/[id]/page": "app/prompts/[id]/page.js",
+  "/prompts/page": "app/prompts/page.js",
+  "/resources/[id]/page": "app/resources/[id]/page.js",
+  "/resources/page": "app/resources/page.js",
+  "/domains/page": "app/domains/page.js"
+}
