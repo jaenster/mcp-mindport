@@ -1,0 +1,13 @@
+server:
+  host: "localhost"
+  port: 8080
+
+storage:
+  path: "./data/storage"
+
+search:
+  index_path: "./data/search"
+
+daemon:
+  pid_file: "/tmp/mcp-mindport.pid"
+  log_file: "/tmp/mcp-mindport.log"

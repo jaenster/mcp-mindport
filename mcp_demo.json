@@ -1,0 +1,188 @@
+{
+  "examples": {
+    "store_resource": {
+      "description": "Store a new resource in MindPort",
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "store_resource",
+          "arguments": {
+            "title": "Python FastAPI Tutorial",
+            "content": "Complete FastAPI tutorial covering async operations, dependency injection, database integration with SQLAlchemy, authentication with JWT tokens, and API documentation with Swagger. Includes testing strategies and deployment patterns.",
+            "type": "tutorial",
+            "tags": ["python", "fastapi", "api", "async", "jwt"],
+            "metadata": {
+              "difficulty": "intermediate",
+              "framework": "fastapi",
+              "language": "python"
+            }
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Resource stored successfully with ID: a1b2c3d4"
+            }
+          ]
+        }
+      }
+    },
+
+    "advanced_search": {
+      "description": "Search with IDE-like features",
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "advanced_search",
+          "arguments": {
+            "query": "API authentication JWT",
+            "mode": "smart",
+            "highlight": true,
+            "sort_by": "relevance",
+            "limit": 3
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "🔍 Found 3 results in 156μs\n\n1. [tutorial] Python FastAPI Tutorial (Score: 0.89)\n   Complete FastAPI tutorial covering async operations, dependency injection, database integration with SQLAlchemy, authentication with JWT tokens...\n   Tags: python, fastapi, api, async, jwt\n\n2. [documentation] API Authentication Guide (Score: 0.76)\n   This guide covers JWT authentication, OAuth2 flows, API key management, and security best practices...\n   Tags: api, authentication, security, jwt\n\n3. [prompt] API Test Generator (Score: 0.45)\n   Generate comprehensive API test cases including authentication scenarios...\n   Tags: api, testing, automation, validation\n\n📊 Type breakdown: tutorial:1 documentation:1 prompt:1"
+            }
+          ]
+        }
+      }
+    },
+
+    "grep": {
+      "description": "CLI-style grep search",
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "grep",
+          "arguments": {
+            "pattern": "JWT",
+            "ignore_case": true,
+            "line_numbers": true,
+            "context": 2
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Python FastAPI Tutorial:1:Complete FastAPI tutorial covering async operations, dependency injection, database integration with SQLAlchemy, authentication with JWT tokens, and API documentation with Swagger.\n  1- Complete FastAPI tutorial covering async operations, dependency injection\n> 1: database integration with SQLAlchemy, authentication with JWT tokens, and API\n  1- documentation with Swagger. Includes testing strategies and deployment\n\nAPI Authentication Guide:1:This guide covers JWT authentication, OAuth2 flows, API key management, and security best practices.\n  1- This guide covers JWT authentication, OAuth2 flows, API key\n> 1: management, and security best practices. Includes code examples\n  1- in Python, JavaScript, and Go. Common authentication patterns"
+            }
+          ]
+        }
+      }
+    },
+
+    "find": {
+      "description": "Find resources by metadata",
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "find",
+          "arguments": {
+            "name": ".*API.*",
+            "type": "f",
+            "tags": ["api", "tutorial"]
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Found 2 items:\n\n/resources/fastapi-tutorial\n  Type: resource, Size: 285 bytes\n  Created: 2024-12-06 10:30, Modified: 2024-12-06 10:30\n  Tags: python, fastapi, api, async, jwt\n\n/resources/api-auth\n  Type: resource, Size: 240 bytes\n  Created: 2024-12-06 08:45, Modified: 2024-12-06 09:15\n  Tags: api, authentication, security, jwt"
+            }
+          ]
+        }
+      }
+    },
+
+    "ripgrep": {
+      "description": "Modern search with smart features",
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "ripgrep",
+          "arguments": {
+            "pattern": "authentication",
+            "smart_case": true,
+            "files_with_matches": true,
+            "type": ["tutorial", "documentation"]
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Python FastAPI Tutorial\nAPI Authentication Guide"
+            }
+          ]
+        }
+      }
+    },
+
+    "fuzzy_search": {
+      "description": "Typo-tolerant search",
+      "request": {
+        "method": "tools/call",
+        "params": {
+          "name": "advanced_search",
+          "arguments": {
+            "query": "authentiaction",
+            "mode": "fuzzy",
+            "limit": 2
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "🔍 Found 2 results in 89μs\n\n1. [documentation] API Authentication Guide (Score: 0.82)\n   This guide covers JWT authentication, OAuth2 flows...\n\n2. [tutorial] Python FastAPI Tutorial (Score: 0.67)\n   Complete FastAPI tutorial covering async operations, dependency injection, database integration with SQLAlchemy, authentication with JWT tokens..."
+            }
+          ]
+        }
+      }
+    }
+  },
+
+  "usage_patterns": {
+    "for_ai_assistants": [
+      "Use advanced_search for general queries with auto-optimization",
+      "Use grep when you need line-by-line text matching",
+      "Use find when searching by metadata/file properties", 
+      "Use ripgrep for modern search with smart case handling",
+      "Combine with store_resource to build a knowledge base"
+    ],
+
+    "search_query_examples": [
+      "\"exact phrase search\"",
+      "fuzzy~",
+      "wild*card?",
+      "/regex.*pattern/",
+      "semantic conceptual search with multiple terms"
+    ],
+
+    "common_workflows": [
+      "1. Store documentation with store_resource",
+      "2. Use advanced_search to find relevant content",
+      "3. Use grep to extract specific lines/patterns",
+      "4. Use find to locate resources by properties"
+    ]
+  }
+}
