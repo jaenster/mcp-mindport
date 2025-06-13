@@ -4,10 +4,10 @@ import { Command } from 'commander';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { SQLiteStorage } from './src/storage.js';
-import { FuseSearch } from './src/search.js';
-import { MCPServer } from './src/server.js';
-import { Config } from './src/types.js';
+import { SQLiteStorage } from './src/storage';
+import { FuseSearch } from './src/search';
+import { MCPServer } from './src/server';
+import { Config } from './src/types';
 
 const program = new Command();
 
