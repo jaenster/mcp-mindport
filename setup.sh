@@ -83,6 +83,17 @@ fi
 
 cd ..
 
+# Build the project
+print_status "Building project..."
+npm run build
+
+if [ $? -eq 0 ]; then
+    print_success "Project built successfully"
+else
+    print_error "Failed to build project"
+    exit 1
+fi
+
 # Run tests to verify everything works
 print_status "Running tests to verify installation..."
 npm run test:run
@@ -95,7 +106,7 @@ fi
 
 # Test MCP server startup (brief)
 print_status "Testing MCP server startup..."
-timeout 3s npm run dev -- --version 2>/dev/null || print_status "MCP server test completed"
+timeout 3s node dist/index.js --version 2>/dev/null || print_status "MCP server test completed"
 
 # Setup Claude Desktop integration (optional)
 CLAUDE_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
@@ -119,8 +130,8 @@ if [ -d "$HOME/Library/Application Support/Claude" ]; then
 {
   "mcpServers": {
     "mindport": {
-      "command": "npx",
-      "args": ["ts-node", "$CURRENT_DIR/index.ts"],
+      "command": "node",
+      "args": ["$CURRENT_DIR/dist/index.js"],
       "env": {
         "MCP_MINDPORT_LOG": "discard"
       }

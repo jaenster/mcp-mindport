@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Markdown, detectContentType } from '../components/ui/markdown';
 
 interface Resource {
   id: string;
@@ -68,165 +71,138 @@ export default function ResourcesPage() {
   };
 
   return (
-    <div>
-      <h1 style={{ marginBottom: '2rem' }}>Resources</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Resources</h1>
+        <p className="text-muted-foreground">
+          Browse and search your stored resources
+        </p>
+      </div>
       
       {/* Filters */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '1.5rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '2rem'
-      }}>
-        <div style={{ 
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '1rem',
-          alignItems: 'end'
-        }}>
-          <div>
-            <label style={{ 
-              display: 'block', 
-              marginBottom: '0.5rem', 
-              fontWeight: 'bold',
-              color: '#333'
-            }}>
-              Search:
-            </label>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search resources..."
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '1rem'
-              }}
-            />
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Search
+              </label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search resources..."
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Domain
+              </label>
+              <select
+                value={selectedDomain}
+                onChange={(e) => setSelectedDomain(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">All domains</option>
+                {domains.map(domain => (
+                  <option key={domain.name} value={domain.name}>
+                    {domain.name} ({domain.resourceCount})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-          
-          <div>
-            <label style={{ 
-              display: 'block', 
-              marginBottom: '0.5rem', 
-              fontWeight: 'bold',
-              color: '#333'
-            }}>
-              Domain:
-            </label>
-            <select
-              value={selectedDomain}
-              onChange={(e) => setSelectedDomain(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem',
-                border: '1px solid #ddd',
-                borderRadius: '4px',
-                fontSize: '1rem',
-                backgroundColor: 'white'
-              }}
-            >
-              <option value="">All domains</option>
-              {domains.map(domain => (
-                <option key={domain.name} value={domain.name}>
-                  {domain.name} ({domain.resourceCount})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Resources List */}
       {loading ? (
-        <div>Loading resources...</div>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
       ) : (
         <div>
           {resources.length === 0 ? (
-            <div style={{
-              backgroundColor: 'white',
-              padding: '2rem',
-              borderRadius: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              textAlign: 'center',
-              color: '#666'
-            }}>
-              No resources found. Try adjusting your search or domain filter.
-            </div>
+            <Card>
+              <CardContent className="text-center py-8">
+                <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-semibold">No resources found</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Try adjusting your search or domain filter.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="space-y-4">
               {resources.map(resource => (
-                <div key={resource.id} style={{
-                  backgroundColor: 'white',
-                  padding: '1.5rem',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0' }}>
-                    <a href={`/resources/${resource.id}`} style={{
-                      color: '#0066cc',
-                      textDecoration: 'none'
-                    }}>
-                      {resource.name}
-                    </a>
-                  </h3>
-                  
-                  {resource.description && (
-                    <p style={{ margin: '0 0 1rem 0', color: '#666' }}>
-                      {resource.description}
-                    </p>
-                  )}
-                  
-                  <div style={{
-                    backgroundColor: '#f8f9fa',
-                    padding: '1rem',
-                    borderRadius: '4px',
-                    marginBottom: '1rem',
-                    fontFamily: 'monospace',
-                    fontSize: '0.875rem',
-                    whiteSpace: 'pre-wrap',
-                    overflow: 'auto'
-                  }}>
-                    {truncateContent(resource.content)}
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
-                    {resource.tags.map(tag => (
-                      <span key={tag} style={{
-                        backgroundColor: '#e3f2fd',
-                        color: '#1976d2',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    color: '#999',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      Domain: <strong>{resource.domain}</strong>
-                      {resource.mimeType && (
-                        <span> • Type: {resource.mimeType}</span>
-                      )}
+                <Card key={resource.id}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      <Link 
+                        href={`/resources/${resource.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {resource.name}
+                      </Link>
+                    </CardTitle>
+                    {resource.description && (
+                      <CardDescription>
+                        {resource.description}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {(() => {
+                      const contentType = detectContentType(resource.content, resource.mimeType);
+                      const truncatedContent = truncateContent(resource.content);
+                      
+                      if (contentType === 'markdown') {
+                        return (
+                          <div className="rounded-md border bg-muted/30 p-4 max-h-40 overflow-auto">
+                            <Markdown content={truncatedContent} />
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="rounded-md bg-muted p-4 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-40">
+                            {truncatedContent}
+                          </div>
+                        );
+                      }
+                    })()}
+                    
+                    {resource.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {resource.tags.map(tag => (
+                          <span key={tag} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between items-center text-sm text-muted-foreground pt-2 border-t">
+                      <div className="space-x-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs">
+                          {resource.domain}
+                        </span>
+                        {resource.mimeType && (
+                          <span>• {resource.mimeType}</span>
+                        )}
+                      </div>
+                      <div>
+                        Updated {new Date(resource.updatedAt).toLocaleDateString()}
+                      </div>
                     </div>
-                    <div>
-                      Updated: {new Date(resource.updatedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}

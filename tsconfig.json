@@ -1,25 +1,19 @@
 {
   "compilerOptions": {
-    "target": "es2020",
+    "target": "es2017",
     "module": "commonjs",
-    "lib": ["es2020"],
     "outDir": "./dist",
-    "rootDir": "./",
-    "strict": false,
+    "rootDir": "./src",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "allowJs": true,
     "declaration": false,
-    "sourceMap": false,
-    "typeRoots": ["./node_modules/@types"],
-    "types": ["node"]
+    "strict": false
   },
   "include": [
-    "*.ts",
     "src/**/*.ts"
   ],
   "exclude": [
@@ -27,15 +21,5 @@
     "dist",
     "site",
     "tests"
-  ],
-  "ts-node": {
-    "compilerOptions": {
-      "module": "commonjs",
-      "target": "es2020",
-      "moduleResolution": "node",
-      "esModuleInterop": true
-    },
-    "transpileOnly": true,
-    "files": true
-  }
+  ]
 }

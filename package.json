@@ -1,15 +1,15 @@
 {
-  "name": "mcp-mindport",
+  "name": "mindport-mcp",
   "version": "1.0.0",
-  "description": "MindPort - MCP Resource Server with optimized search capabilities",
-  "main": "src/index.ts",
+  "description": "A high-performance Model Context Protocol (MCP) server with optimized storage and search capabilities for AI systems",
+  "main": "dist/index.js",
   "bin": {
-    "mcp-mindport": "src/index.ts"
+    "mindport-mcp": "dist/index.js"
   },
   "scripts": {
-    "dev": "npx ts-node index.ts",
-    "start": "npx ts-node index.ts",
-    "build": "echo 'Build step skipped - using ts-node for direct execution'",
+    "dev": "npx ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "build": "npx tsc --skipLibCheck && echo '#!/usr/bin/env node' | cat - dist/index.js > temp && mv temp dist/index.js && chmod +x dist/index.js",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
@@ -18,16 +18,37 @@
     "web": "cd site && npm run dev",
     "web:build": "cd site && npm run build",
     "web:start": "cd site && npm run start",
-    "postinstall": "echo '\\n🎉 MindPort setup complete!\\n\\nQuick start:\\n  npm run dev     # Start MCP server\\n  npm run web     # Start web interface\\n  npm test        # Run tests\\n\\nSee README.md for full documentation.\\n'"
+    "prepublishOnly": "npm run build && npm run test:run",
+    "postinstall": "chmod +x install.sh && ./install.sh",
+    "install:claude": "./install.sh"
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
     "search",
-    "storage"
+    "storage",
+    "ai",
+    "claude",
+    "resources",
+    "knowledge-base"
   ],
-  "author": "",
+  "author": "MindPort AI",
   "license": "MIT",
+  "homepage": "https://github.com/mindport-ai/mcp-mindport",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mindport-ai/mcp-mindport.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mindport-ai/mcp-mindport/issues"
+  },
+  "files": [
+    "dist/",
+    "site/",
+    "install.sh",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "commander": "^12.0.0",

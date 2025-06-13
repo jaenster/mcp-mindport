@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  mindport:
+    build: .
+    ports:
+      - "3001:3001"
+    volumes:
+      - mindport_data:/data
+      - ./config:/data/.config/mindport:ro
+    environment:
+      - NODE_ENV=production
+      - MCP_MINDPORT_LOG=/data/.config/mindport/mindport.log
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "dist/index.js", "--health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mindport_data:
+    driver: local

@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Markdown, detectContentType } from '../../components/ui/markdown';
 
 interface Resource {
   id: string;
@@ -43,154 +46,132 @@ export default function ResourceDetailPage() {
   }, [params.id]);
 
   if (loading) {
-    return <div>Loading resource...</div>;
-  }
-
-  if (error) {
     return (
-      <div style={{
-        backgroundColor: '#fee',
-        padding: '1rem',
-        borderRadius: '8px',
-        border: '1px solid #fcc',
-        color: '#c33'
-      }}>
-        Error: {error}
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (!resource) {
-    return <div>Resource not found</div>;
+  if (error) {
+    return (
+      <Card className="border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{error}</p>
+        </CardContent>
+      </Card>
+    );
   }
 
+  if (!resource) {
+    return (
+      <Card>
+        <CardContent className="text-center py-8">
+          <p>Resource not found</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const contentType = detectContentType(resource.content, resource.mimeType);
+
   return (
-    <div>
+    <div className="space-y-6">
       {/* Back Button */}
-      <div style={{ marginBottom: '1rem' }}>
-        <a href="/resources" style={{
-          color: '#0066cc',
-          textDecoration: 'none',
-          fontSize: '0.875rem'
-        }}>
+      <div>
+        <Link href="/resources" className="text-sm text-primary hover:underline">
           ← Back to Resources
-        </a>
+        </Link>
       </div>
 
       {/* Resource Header */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '2rem'
-      }}>
-        <h1 style={{ margin: '0 0 1rem 0' }}>{resource.name}</h1>
-        
-        {resource.description && (
-          <p style={{ 
-            margin: '0 0 1.5rem 0', 
-            color: '#666', 
-            fontSize: '1.125rem',
-            lineHeight: '1.5'
-          }}>
-            {resource.description}
-          </p>
-        )}
-        
-        {/* Tags */}
-        {resource.tags.length > 0 && (
-          <div style={{ marginBottom: '1.5rem' }}>
-            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#666' }}>
-              TAGS
-            </h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {resource.tags.map(tag => (
-                <span key={tag} style={{
-                  backgroundColor: '#e3f2fd',
-                  color: '#1976d2',
-                  padding: '0.5rem 0.75rem',
-                  borderRadius: '16px',
-                  fontSize: '0.875rem',
-                  fontWeight: 'bold'
-                }}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Metadata */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-          backgroundColor: '#f8f9fa',
-          padding: '1rem',
-          borderRadius: '4px'
-        }}>
-          <div>
-            <strong>Domain:</strong> {resource.domain}
-          </div>
-          {resource.mimeType && (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">{resource.name}</CardTitle>
+          {resource.description && (
+            <CardDescription className="text-lg">
+              {resource.description}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Tags */}
+          {resource.tags.length > 0 && (
             <div>
-              <strong>Type:</strong> {resource.mimeType}
+              <h3 className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                Tags
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {resource.tags.map(tag => (
+                  <span key={tag} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
+                    {tag}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-          {resource.uri && (
+          
+          {/* Metadata */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
             <div>
-              <strong>URI:</strong> 
-              <a href={resource.uri} target="_blank" rel="noopener noreferrer" style={{
-                color: '#0066cc',
-                marginLeft: '0.5rem'
-              }}>
-                {resource.uri}
-              </a>
+              <span className="font-medium">Domain:</span> {resource.domain}
             </div>
-          )}
-          <div>
-            <strong>Created:</strong> {new Date(resource.createdAt).toLocaleString()}
+            {resource.mimeType && (
+              <div>
+                <span className="font-medium">Type:</span> {resource.mimeType}
+              </div>
+            )}
+            {resource.uri && (
+              <div className="lg:col-span-3">
+                <span className="font-medium">URI:</span>{' '}
+                <a 
+                  href={resource.uri} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline ml-1 break-all"
+                >
+                  {resource.uri}
+                </a>
+              </div>
+            )}
+            <div>
+              <span className="font-medium">Created:</span> {new Date(resource.createdAt).toLocaleString()}
+            </div>
+            <div>
+              <span className="font-medium">Updated:</span> {new Date(resource.updatedAt).toLocaleString()}
+            </div>
           </div>
-          <div>
-            <strong>Updated:</strong> {new Date(resource.updatedAt).toLocaleString()}
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Resource Content */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        <h2 style={{ margin: '0 0 1rem 0' }}>Content</h2>
-        
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '1.5rem',
-          borderRadius: '8px',
-          fontFamily: 'monospace',
-          fontSize: '0.875rem',
-          lineHeight: '1.6',
-          whiteSpace: 'pre-wrap',
-          overflow: 'auto',
-          maxHeight: '70vh',
-          border: '1px solid #e9ecef'
-        }}>
-          {resource.content}
-        </div>
-        
-        <div style={{ 
-          marginTop: '1rem',
-          fontSize: '0.75rem',
-          color: '#999',
-          textAlign: 'right'
-        }}>
-          {resource.content.length.toLocaleString()} characters
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Content</CardTitle>
+          <CardDescription>
+            {resource.content.length.toLocaleString()} characters
+            {contentType !== 'text' && (
+              <span className="ml-2 px-2 py-1 bg-secondary text-secondary-foreground rounded text-xs">
+                {contentType}
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {contentType === 'markdown' ? (
+            <div className="border rounded-lg p-4 bg-background">
+              <Markdown content={resource.content} />
+            </div>
+          ) : (
+            <div className="rounded-lg bg-muted p-4 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-96 border">
+              {resource.content}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

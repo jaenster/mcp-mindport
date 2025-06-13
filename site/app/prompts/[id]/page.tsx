@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 
 interface PromptTemplate {
   id: string;
@@ -21,6 +23,7 @@ export default function PromptDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [variableValues, setVariableValues] = useState<Record<string, string>>({});
   const [renderedTemplate, setRenderedTemplate] = useState<string>('');
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -64,211 +67,168 @@ export default function PromptDetailPage() {
     }
   };
 
-  if (loading) {
-    return <div>Loading prompt...</div>;
-  }
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(renderedTemplate);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+    }
+  };
 
-  if (error) {
+  if (loading) {
     return (
-      <div style={{
-        backgroundColor: '#fee',
-        padding: '1rem',
-        borderRadius: '8px',
-        border: '1px solid #fcc',
-        color: '#c33'
-      }}>
-        Error: {error}
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <Card className="border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">Error</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p>{error}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!prompt) {
-    return <div>Prompt not found</div>;
+    return (
+      <Card>
+        <CardContent className="text-center py-8">
+          <p>Prompt not found</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Back Button */}
-      <div style={{ marginBottom: '1rem' }}>
-        <a href="/prompts" style={{
-          color: '#0066cc',
-          textDecoration: 'none',
-          fontSize: '0.875rem'
-        }}>
+      <div>
+        <Link href="/prompts" className="text-sm text-primary hover:underline">
           ← Back to Prompts
-        </a>
+        </Link>
       </div>
 
       {/* Prompt Header */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '2rem'
-      }}>
-        <h1 style={{ margin: '0 0 1rem 0' }}>{prompt.name}</h1>
-        
-        {prompt.description && (
-          <p style={{ 
-            margin: '0 0 1.5rem 0', 
-            color: '#666', 
-            fontSize: '1.125rem',
-            lineHeight: '1.5'
-          }}>
-            {prompt.description}
-          </p>
-        )}
-        
-        {/* Metadata */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-          backgroundColor: '#f8f9fa',
-          padding: '1rem',
-          borderRadius: '4px'
-        }}>
-          <div>
-            <strong>Domain:</strong> {prompt.domain}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl">{prompt.name}</CardTitle>
+          {prompt.description && (
+            <CardDescription className="text-lg">
+              {prompt.description}
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted rounded-lg">
+            <div>
+              <span className="font-medium">Domain:</span> {prompt.domain}
+            </div>
+            <div>
+              <span className="font-medium">Variables:</span> {prompt.variables.length}
+            </div>
+            <div>
+              <span className="font-medium">Created:</span> {new Date(prompt.createdAt).toLocaleDateString()}
+            </div>
+            <div>
+              <span className="font-medium">Updated:</span> {new Date(prompt.updatedAt).toLocaleDateString()}
+            </div>
           </div>
-          <div>
-            <strong>Variables:</strong> {prompt.variables.length}
-          </div>
-          <div>
-            <strong>Created:</strong> {new Date(prompt.createdAt).toLocaleString()}
-          </div>
-          <div>
-            <strong>Updated:</strong> {new Date(prompt.updatedAt).toLocaleString()}
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Variable Inputs */}
       {prompt.variables.length > 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '8px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '1rem'
-          }}>
-            <h2 style={{ margin: 0 }}>Template Variables</h2>
-            <button
-              onClick={resetVariables}
-              style={{
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
-            >
-              Reset All
-            </button>
-          </div>
-          
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '1rem'
-          }}>
-            {prompt.variables.map(variable => (
-              <div key={variable}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontWeight: 'bold',
-                  color: '#333',
-                  fontFamily: 'monospace'
-                }}>
-                  {`{{${variable}}}`}
-                </label>
-                <input
-                  type="text"
-                  value={variableValues[variable] || ''}
-                  onChange={(e) => handleVariableChange(variable, e.target.value)}
-                  placeholder={`Enter value for ${variable}...`}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    fontSize: '0.875rem'
-                  }}
-                />
+        <Card>
+          <CardHeader>
+            <div className="flex justify-between items-center">
+              <div>
+                <CardTitle>Template Variables</CardTitle>
+                <CardDescription>
+                  Enter values for the template variables to see the rendered output
+                </CardDescription>
               </div>
-            ))}
-          </div>
-        </div>
+              <button
+                onClick={resetVariables}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3"
+              >
+                Reset All
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {prompt.variables.map(variable => (
+                <div key={variable} className="space-y-2">
+                  <label className="text-sm font-medium font-mono bg-yellow-100 dark:bg-yellow-900 px-2 py-1 rounded">
+                    {`{{${variable}}}`}
+                  </label>
+                  <input
+                    type="text"
+                    value={variableValues[variable] || ''}
+                    onChange={(e) => handleVariableChange(variable, e.target.value)}
+                    placeholder={`Enter value for ${variable}...`}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Rendered Template */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '2rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-      }}>
-        <h2 style={{ margin: '0 0 1rem 0' }}>
-          {prompt.variables.length > 0 ? 'Rendered Template' : 'Template'}
-        </h2>
-        
-        <div style={{
-          backgroundColor: '#f8f9fa',
-          padding: '1.5rem',
-          borderRadius: '8px',
-          fontFamily: 'monospace',
-          fontSize: '0.875rem',
-          lineHeight: '1.6',
-          whiteSpace: 'pre-wrap',
-          overflow: 'auto',
-          maxHeight: '70vh',
-          border: '1px solid #e9ecef'
-        }}>
-          {renderedTemplate}
-        </div>
-        
-        <div style={{ 
-          marginTop: '1rem',
-          fontSize: '0.75rem',
-          color: '#999',
-          textAlign: 'right'
-        }}>
-          {renderedTemplate.length.toLocaleString()} characters
-        </div>
-        
-        {/* Copy Button */}
-        <div style={{ marginTop: '1rem' }}>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(renderedTemplate);
-              // Simple feedback - could be improved with toast
-              alert('Template copied to clipboard!');
-            }}
-            style={{
-              backgroundColor: '#0066cc',
-              color: 'white',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: 'bold'
-            }}
-          >
-            📋 Copy to Clipboard
-          </button>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>
+                {prompt.variables.length > 0 ? 'Rendered Template' : 'Template'}
+              </CardTitle>
+              <CardDescription>
+                {renderedTemplate.length.toLocaleString()} characters
+              </CardDescription>
+            </div>
+            <button
+              onClick={copyToClipboard}
+              className={`inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-9 px-3 ${
+                copySuccess 
+                  ? 'bg-green-100 text-green-800 border border-green-200' 
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              }`}
+            >
+              {copySuccess ? (
+                <>
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy
+                </>
+              )}
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg bg-muted p-4 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-96 border">
+            {renderedTemplate}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

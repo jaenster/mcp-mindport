@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 
 interface PromptTemplate {
   id: string;
@@ -64,144 +66,109 @@ export default function PromptsPage() {
   };
 
   return (
-    <div>
-      <h1 style={{ marginBottom: '2rem' }}>Prompt Templates</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Prompt Templates</h1>
+        <p className="text-muted-foreground">
+          Manage and browse your reusable prompt templates
+        </p>
+      </div>
       
       {/* Filter */}
-      <div style={{
-        backgroundColor: 'white',
-        padding: '1.5rem',
-        borderRadius: '8px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '2rem'
-      }}>
-        <div style={{ maxWidth: '300px' }}>
-          <label style={{ 
-            display: 'block', 
-            marginBottom: '0.5rem', 
-            fontWeight: 'bold',
-            color: '#333'
-          }}>
-            Domain:
-          </label>
-          <select
-            value={selectedDomain}
-            onChange={(e) => setSelectedDomain(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.5rem',
-              border: '1px solid #ddd',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              backgroundColor: 'white'
-            }}
-          >
-            <option value="">All domains</option>
-            {domains.map(domain => (
-              <option key={domain.name} value={domain.name}>
-                {domain.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="max-w-xs space-y-2">
+            <label className="text-sm font-medium">
+              Domain
+            </label>
+            <select
+              value={selectedDomain}
+              onChange={(e) => setSelectedDomain(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="">All domains</option>
+              {domains.map(domain => (
+                <option key={domain.name} value={domain.name}>
+                  {domain.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Prompts List */}
       {loading ? (
-        <div>Loading prompts...</div>
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
       ) : (
         <div>
           {prompts.length === 0 ? (
-            <div style={{
-              backgroundColor: 'white',
-              padding: '2rem',
-              borderRadius: '8px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              textAlign: 'center',
-              color: '#666'
-            }}>
-              No prompt templates found. Create prompts using the MCP server to see them here!
-            </div>
+            <Card>
+              <CardContent className="text-center py-8">
+                <svg className="mx-auto h-12 w-12 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <h3 className="mt-2 text-sm font-semibold">No prompt templates found</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create prompts using the MCP server to see them here!
+                </p>
+              </CardContent>
+            </Card>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div className="space-y-4">
               {prompts.map(prompt => (
-                <div key={prompt.id} style={{
-                  backgroundColor: 'white',
-                  padding: '1.5rem',
-                  borderRadius: '8px',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }}>
-                  <h3 style={{ margin: '0 0 0.5rem 0' }}>
-                    <a href={`/prompts/${prompt.id}`} style={{
-                      color: '#0066cc',
-                      textDecoration: 'none'
-                    }}>
-                      {prompt.name}
-                    </a>
-                  </h3>
-                  
-                  {prompt.description && (
-                    <p style={{ margin: '0 0 1rem 0', color: '#666' }}>
-                      {prompt.description}
-                    </p>
-                  )}
-                  
-                  <div style={{
-                    backgroundColor: '#f8f9fa',
-                    padding: '1rem',
-                    borderRadius: '4px',
-                    marginBottom: '1rem',
-                    fontFamily: 'monospace',
-                    fontSize: '0.875rem',
-                    whiteSpace: 'pre-wrap',
-                    overflow: 'auto'
-                  }}>
-                    {truncateTemplate(prompt.template)}
-                  </div>
-                  
-                  {/* Variables */}
-                  {prompt.variables.length > 0 && (
-                    <div style={{ marginBottom: '1rem' }}>
-                      <h4 style={{ 
-                        margin: '0 0 0.5rem 0', 
-                        fontSize: '0.875rem', 
-                        color: '#666' 
-                      }}>
-                        Variables:
-                      </h4>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {prompt.variables.map(variable => (
-                          <span key={variable} style={{
-                            backgroundColor: '#fff3cd',
-                            color: '#856404',
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '12px',
-                            fontSize: '0.75rem',
-                            fontWeight: 'bold',
-                            fontFamily: 'monospace'
-                          }}>
-                            {`{{${variable}}}`}
-                          </span>
-                        ))}
+                <Card key={prompt.id}>
+                  <CardHeader>
+                    <CardTitle className="text-lg">
+                      <Link 
+                        href={`/prompts/${prompt.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        {prompt.name}
+                      </Link>
+                    </CardTitle>
+                    {prompt.description && (
+                      <CardDescription>
+                        {prompt.description}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-md bg-muted p-4 font-mono text-sm whitespace-pre-wrap overflow-auto max-h-40">
+                      {truncateTemplate(prompt.template)}
+                    </div>
+                    
+                    {/* Variables */}
+                    {prompt.variables.length > 0 && (
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                          Variables:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {prompt.variables.map(variable => (
+                            <span key={variable} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                              {`{{${variable}}}`}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="flex justify-between items-center text-sm text-muted-foreground pt-2 border-t">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full bg-secondary text-secondary-foreground text-xs">
+                        {prompt.domain}
+                      </span>
+                      <div>
+                        Updated {new Date(prompt.updatedAt).toLocaleDateString()}
                       </div>
                     </div>
-                  )}
-                  
-                  <div style={{ 
-                    fontSize: '0.875rem', 
-                    color: '#999',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
-                  }}>
-                    <div>
-                      Domain: <strong>{prompt.domain}</strong>
-                    </div>
-                    <div>
-                      Updated: {new Date(prompt.updatedAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}

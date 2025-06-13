@@ -1,38 +1,62 @@
 # MindPort MCP Server
 
-A high-performance Model Context Protocol (MCP) server built in TypeScript/Node.js, designed for AI systems to efficiently store, search, and retrieve resources with minimal token usage and modern search capabilities.
+A high-performance Model Context Protocol (MCP) server built in TypeScript/Node.js that provides optimized storage and search capabilities for AI systems. Designed for seamless integration with Claude Desktop and other MCP clients.
 
-## ✨ Features
+## Features
 
-- **🔍 Advanced Search**: Token-efficient fuzzy search, regex patterns, and grep-like functionality
-- **📦 SQLite Storage**: Reliable, lightweight database with domain isolation
-- **🏷️ Smart Organization**: Domain-based resource management with tag filtering
-- **🎯 AI-Optimized**: Designed specifically for Claude Desktop/Code integration
-- **⚡ High Performance**: Fast search and retrieval optimized for large datasets  
-- **🧪 Comprehensive Testing**: 76+ tests covering all functionality
-- **📝 Prompt Templates**: Store and render reusable prompt templates with variables
+- **Advanced Search**: Token-efficient fuzzy search, regex patterns, and grep-like functionality
+- **SQLite Storage**: Reliable, lightweight database with domain isolation
+- **Smart Organization**: Domain-based resource management with tag filtering
+- **AI-Optimized**: Designed specifically for Claude Desktop/Code integration
+- **High Performance**: Fast search and retrieval optimized for large datasets
+- **Comprehensive Testing**: 76+ tests covering all functionality
+- **Prompt Templates**: Store and render reusable prompt templates with variables
+- **Modern Web Interface**: Professional dashboard for browsing and managing resources
 
-## 🚀 Quick Start
+## Installation
 
-### One-Command Setup (Fresh Machine)
+### NPM Package
 
 ```bash
-git clone <repository-url>
-cd mcp-mindport
-./setup.sh
+npm install -g mindport-mcp
+mindport --help
 ```
 
-The setup script automatically:
-- ✅ Installs all dependencies
-- ✅ Runs tests to verify everything works  
-- ✅ Configures Claude Desktop integration
-- ✅ Shows you next steps
-
-### Manual Setup
+### From Source
 
 ```bash
-# Install dependencies for both MCP server and web interface
-npm run setup
+git clone https://github.com/mindport-ai/mcp-mindport.git
+cd mcp-mindport
+npm install
+npm run build
+```
+
+### Production Deployment
+
+```bash
+# Install globally
+npm install -g mindport-mcp
+
+# Or run with npx
+npx mindport-mcp
+
+# Start web interface
+npx mindport-mcp --web
+```
+
+The installation automatically:
+- Installs all dependencies
+- Sets up SQLite database
+- Configures default settings
+- Creates necessary directories
+
+## Quick Start
+
+### Development Mode
+
+```bash
+# Install dependencies
+npm install
 
 # Start MCP server (for Claude Desktop)
 npm run dev
@@ -42,23 +66,91 @@ npm run web
 # Visit http://localhost:3001
 ```
 
-### Development & Testing
+### Production Mode
 
 ```bash
-# Run comprehensive test suite (76 tests)
+# Build for production
+npm run build
+
+# Start production server
+npm start
+
+# Start web interface
+npm run web:start
+```
+
+### Testing
+
+```bash
+# Run comprehensive test suite
 npm test
 
 # Run tests once
 npm run test:run
 
-# Run tests with UI
-npm run test:ui
-
-# Build everything
-npm run build && npm run web:build
+# Run with coverage
+npm run test:coverage
 ```
 
-## 🔧 Configuration
+## Production Deployment
+
+### Publishing to NPM
+
+```bash
+# Prepare for release
+npm run build
+npm run test:run
+
+# Publish to NPM
+npm publish
+
+# Install globally from NPM
+npm install -g mindport-mcp
+```
+
+### Docker Deployment
+
+```bash
+# Build Docker image
+docker build -t mindport-mcp .
+
+# Run in container
+docker run -d -p 3001:3001 \
+  -v ~/.config/mindport:/root/.config/mindport \
+  mindport-mcp
+```
+
+### Production Server Setup
+
+```bash
+# Install globally
+npm install -g mindport-mcp
+
+# Create systemd service (Linux)
+sudo tee /etc/systemd/system/mindport.service << EOF
+[Unit]
+Description=MindPort MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=mindport
+WorkingDirectory=/opt/mindport
+ExecStart=/usr/bin/node /usr/local/bin/mindport-mcp
+Restart=always
+Environment=NODE_ENV=production
+Environment=MCP_MINDPORT_LOG=/var/log/mindport.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+sudo systemctl enable mindport
+sudo systemctl start mindport
+```
+
+## Configuration
 
 The server automatically creates configuration at `~/.config/mindport/config.yaml`:
 
@@ -90,7 +182,7 @@ export MCP_MINDPORT_DOMAIN=my-project
 export MCP_MINDPORT_STORE_PATH=/path/to/storage.db
 ```
 
-## 🛠️ Claude Desktop Integration
+## Claude Desktop Integration
 
 Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
@@ -99,7 +191,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
   "mcpServers": {
     "mindport": {
       "command": "npx",
-      "args": ["ts-node", "/path/to/mcp-mindport/index.ts"],
+      "args": ["mindport-mcp"],
       "env": {
         "MCP_MINDPORT_LOG": "discard"
       }
@@ -108,15 +200,15 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 }
 ```
 
-**Restart Claude Desktop** to activate MindPort!
+**Restart Claude Desktop** to activate MindPort.
 
-## 📚 Available MCP Tools
+## Available MCP Tools
 
 ### Resource Management
 
 #### `store_resource`
 Store content with metadata and tags
-```typescript
+```json5
 {
   id: "api-docs-v1",
   name: "API Documentation", 
@@ -129,13 +221,13 @@ Store content with metadata and tags
 
 #### `get_resource`
 Retrieve specific resource by ID
-```typescript
+```json5
 { id: "api-docs-v1" }
 ```
 
 #### `list_resources` 
 List resources in current domain
-```typescript
+```json5
 { limit: 20, offset: 0 }
 ```
 
@@ -143,7 +235,7 @@ List resources in current domain
 
 #### `search_resources`
 Fast, token-efficient fuzzy search
-```typescript
+```json5
 {
   query: "API authentication methods",
   limit: 10
@@ -152,7 +244,7 @@ Fast, token-efficient fuzzy search
 
 #### `advanced_search`
 Complex queries with tag filtering
-```typescript
+```json5
 {
   query: "database design",
   tags: ["sql", "performance"],
@@ -162,13 +254,13 @@ Complex queries with tag filtering
 
 #### `grep`
 Regex pattern matching (like ripgrep)
-```typescript
+```json5
 { pattern: "function\\s+\\w+\\(" }
 ```
 
 #### `find`
 Find resources by name patterns
-```typescript
+```json5
 { pattern: "^API.*" }
 ```
 
@@ -176,13 +268,13 @@ Find resources by name patterns
 
 #### `list_domains`
 List all available domains
-```typescript
+```json5
 {}
 ```
 
 #### `create_domain` 
 Create new domain context
-```typescript
+```json5
 {
   name: "frontend-project",
   description: "Frontend development resources"
@@ -191,13 +283,13 @@ Create new domain context
 
 #### `switch_domain`
 Change current domain
-```typescript
+```json5
 { domain: "frontend-project" }
 ```
 
 #### `domain_stats`
 Get domain statistics and top tags
-```typescript
+```json5
 { domain: "frontend-project" }  // optional
 ```
 
@@ -205,7 +297,7 @@ Get domain statistics and top tags
 
 #### `store_prompt`
 Store reusable prompt templates
-```typescript
+```json5
 {
   id: "code-review",
   name: "Code Review Prompt",
@@ -216,13 +308,13 @@ Store reusable prompt templates
 
 #### `list_prompts`
 List available prompt templates
-```typescript
+```json5
 {}
 ```
 
 #### `get_prompt`
 Retrieve and render prompts with variables
-```typescript
+```json5
 {
   id: "code-review",
   variables: {
@@ -233,7 +325,7 @@ Retrieve and render prompts with variables
 }
 ```
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐
@@ -266,7 +358,7 @@ Retrieve and render prompts with variables
 - **Commander.js**: Robust CLI interface with comprehensive options
 - **Vitest**: Modern testing framework with 76+ comprehensive tests
 
-## 🎯 Token Optimization
+## Token Optimization
 
 MindPort is specifically optimized for AI interactions:
 
@@ -276,7 +368,7 @@ MindPort is specifically optimized for AI interactions:
 - **Configurable Limits**: Control response size with limit parameters
 - **Context-Aware**: Domain isolation reduces noise in search results
 
-## 🔍 Search Capabilities
+## Search Capabilities
 
 ### Fuzzy Search
 ```bash
@@ -302,7 +394,7 @@ advanced_search: { query: "auth", tags: ["security"], exactTags: true }
 advanced_search: { query: "auth", tags: ["sec"], exactTags: false }
 ```
 
-## 📊 Performance
+## Performance
 
 Tested with 100+ resources:
 - **Storage**: < 10s for 100 resources
@@ -311,7 +403,7 @@ Tested with 100+ resources:
 - **Grep**: < 100ms for regex pattern matching
 - **Pagination**: < 500ms for large result sets
 
-## 🧪 Testing
+## Testing
 
 Comprehensive test suite with 76 tests covering:
 
@@ -331,7 +423,7 @@ npm test server
 npm test integration
 ```
 
-## 🚀 Advanced Usage
+## Advanced Usage
 
 ### Multi-Domain Workflow
 ```bash
@@ -369,7 +461,7 @@ get_prompt: {
 }
 ```
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -377,10 +469,10 @@ get_prompt: {
 4. Ensure all tests pass: `npm run test:run`
 5. Submit a pull request
 
-## 📄 License
+## License
 
 MIT License - see LICENSE file for details.
 
 ---
 
-**Built for Claude Desktop** 🤖 | **Optimized for AI Workflows** ⚡ | **TypeScript + SQLite + Vitest** 🛠️
+Built for Claude Desktop | Optimized for AI Workflows | TypeScript + SQLite + Vitest

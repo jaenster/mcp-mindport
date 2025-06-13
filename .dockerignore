@@ -21,13 +21,18 @@ coverage.out
 *.swo
 *~
 
-# Build artifacts
+# Build artifacts (keep dist/ for production)
 build/
-dist/
 *.exe
 *.dll
 *.so
 *.dylib
+
+# Node.js
+node_modules
+npm-debug.log
+site/node_modules
+site/.next
 
 # Data directories (if they exist in development)
 data/
