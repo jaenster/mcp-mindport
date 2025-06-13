@@ -7,13 +7,18 @@
     "mcp-mindport": "src/index.ts"
   },
   "scripts": {
+    "dev": "npx ts-node index.ts",
+    "start": "npx ts-node index.ts",
+    "build": "echo 'Build step skipped - using ts-node for direct execution'",
     "test": "vitest",
     "test:run": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "build": "tsc",
-    "start": "ts-node index.ts",
-    "dev": "ts-node index.ts"
+    "setup": "npm install && cd site && npm install",
+    "web": "cd site && npm run dev",
+    "web:build": "cd site && npm run build",
+    "web:start": "cd site && npm run start",
+    "postinstall": "echo '\\n🎉 MindPort setup complete!\\n\\nQuick start:\\n  npm run dev     # Start MCP server\\n  npm run web     # Start web interface\\n  npm test        # Run tests\\n\\nSee README.md for full documentation.\\n'"
   },
   "keywords": [
     "mcp",

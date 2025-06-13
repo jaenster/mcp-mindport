@@ -14,36 +14,32 @@ A high-performance Model Context Protocol (MCP) server built in TypeScript/Node.
 
 ## 🚀 Quick Start
 
-### For Claude Desktop Users (Recommended)
+### One-Command Setup (Fresh Machine)
 
 ```bash
-# Install dependencies
-npm install
-
-# Configure Claude Desktop integration  
-npm run start -- --list-domains  # Test installation
-
-# MindPort is now available in Claude Desktop!
+git clone <repository-url>
+cd mcp-mindport
+./setup.sh
 ```
+
+The setup script automatically:
+- ✅ Installs all dependencies
+- ✅ Runs tests to verify everything works  
+- ✅ Configures Claude Desktop integration
+- ✅ Shows you next steps
 
 ### Manual Setup
 
 ```bash
-# Clone repository
-git clone <repository>
-cd mcp-mindport
+# Install dependencies for both MCP server and web interface
+npm run setup
 
-# Install dependencies
-npm install
+# Start MCP server (for Claude Desktop)
+npm run dev
 
-# Run server in stdio mode (for MCP clients)
-npm start
-
-# Run with custom domain
-npm start -- --domain my-project
-
-# List available domains
-npm start -- --list-domains
+# Start web interface (in new terminal)
+npm run web
+# Visit http://localhost:3001
 ```
 
 ### Development & Testing
@@ -58,8 +54,8 @@ npm run test:run
 # Run tests with UI
 npm run test:ui
 
-# Run with coverage
-npm run test:coverage
+# Build everything
+npm run build && npm run web:build
 ```
 
 ## 🔧 Configuration

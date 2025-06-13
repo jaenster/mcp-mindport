@@ -13,15 +13,18 @@ A simple web interface for browsing and searching MindPort MCP data.
 ## Getting Started
 
 ```bash
-# Install dependencies
+# From main project directory
+npm run web
+
+# Or manually:
 cd site
 npm install
-
-# Start development server
 npm run dev
 
 # Visit http://localhost:3001
 ```
+
+> **Note**: The web interface requires the MCP server database to exist. Run `npm run dev` from the main directory first to create the database.
 
 ## Architecture
 
