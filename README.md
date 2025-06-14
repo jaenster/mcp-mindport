@@ -329,7 +329,7 @@ Retrieve and render prompts with variables
 
 ```
 ┌─────────────────┐
-│   Claude Desktop │ (MCP Client)
+│  Claude Desktop │ (MCP Client)
 │                 │
 └─────────┬───────┘
           │ JSON-RPC 2.0 via stdio
